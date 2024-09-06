@@ -1,7 +1,6 @@
-from core.db.standalone import setup_django, setup_migrations_location
-from importlib import import_module
-from django.utils.module_loading import module_dir
+from core.db.standalone import setup_django
 from pathlib import Path
+import pytest
 
 
 def test_blank_database(tmp_path):

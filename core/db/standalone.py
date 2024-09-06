@@ -82,21 +82,22 @@ def setup_django(db_file=None,
         migrations_location = setup_migrations_location(migrations_location)
 
     # At this step we override the default settings with our own
-    settings.configure(
-        BASE_DIR = Path(__file__).resolve().parent.parent,
-        DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField',
-        INSTALLED_APPS=('core.db',),
-        DATABASES={
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': db_file,
-            }
-        },
-        TIME_ZONE='UTC',
-        USE_TZ=True,
-        MIGRATION_MODULES=migrations_location
-    )
+    if not settings.configured:
+        settings.configure(
+            BASE_DIR = Path(__file__).resolve().parent.parent,
+            DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField',
+            INSTALLED_APPS=('core.db',),
+            DATABASES={
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': db_file,
+                }
+            },
+            TIME_ZONE='UTC',
+            USE_TZ=True,
+            MIGRATION_MODULES=migrations_location
+        )
 
-    check_and_create_database()
-    django.setup()
-  
+        django.setup()
+
+        check_and_create_database()

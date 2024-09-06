@@ -127,9 +127,12 @@ class Relationship(models.Model):
     class Meta:
         app_label = "db"
 
+    def __repr__(self):
+        return f'[{self.subject.name}] [{self.predicate}] [{self.related_to.name}]'
+
     predicate = models.CharField(max_length=50)
-    subject_collection = models.ManyToManyField(Collection, related_name="subject")
-    related_collection = models.ManyToManyField(Collection, related_name="related")
+    subject = models.ForeignKey(Collection, related_name="subject",on_delete=models.CASCADE)
+    related_to = models.ForeignKey(Collection, related_name="related",on_delete=models.CASCADE)
 
 
 class Variable(models.Model):
@@ -193,3 +196,12 @@ class Cell_Method(models.Model):
     id = models.AutoField(primary_key=True)
     method = models.CharField(max_length=1024)
     axis = models.CharField(max_length=256)
+
+class Directory(models.Model):
+    class Meta:
+        app_label = "db"
+    
+    id = models.AutoField(primary_key=True)
+    path = models.CharField(max_length=1024)
+    location = models.ManyToManyField(Location)
+    CFA = models.BooleanField()
