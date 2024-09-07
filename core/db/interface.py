@@ -1,7 +1,7 @@
 import os
 import sys
 
-from django.db.models import Q
+from django.db.models import Q, Count
 from django import template
 
 from tqdm import tqdm
@@ -17,11 +17,6 @@ register = template.Library()
 def get_obj_field(obj, key):
     return obj[key]
 #FIXME: When and how is the filter used, it's come from the old db.py, but it's a GOB thing.
-
-
-class CollectionError(Exception):
-    def __init__(self, name, message):
-        super().__init__(f"(Collection {name} {message}")
 
 
 class CollectionDB:
@@ -65,17 +60,16 @@ class CollectionDB:
             pdb = Protocol.objects.get(name=protocol_name)
         except Protocol.DoesNotExist:
             pdb = Protocol(name=protocol_name)
+            pdb.save()
             if locations:
                 existing_locations = [e.name for e in self.retrieve_locations()]
                 for p in locations:
-                    if p.name not in existing_locations:
+                    if p not in existing_locations:
                         loc = Location(name=p)
-                        self.session.add(loc)
                     else:
                         loc = self.retrieve_location(p)
                     loc.protocols.add(pdb)
-            self.session.add(pdb)
-            self.session.commit()
+                    loc.save()
         else:
             raise ValueError(f"Attempt to add existing protocol - {protocol_name}")
 
@@ -90,7 +84,6 @@ class CollectionDB:
 
         rel = Relationship(subject=c1, predicate=relationship, related_to=c2)
         rel.save()
-        print(f'saved {rel}')
         return rel
 
     def add_relationships(
@@ -452,7 +445,6 @@ class CollectionDB:
             x = Location.objects.get(name=location_name)
         except Location.DoesNotExist:
             raise ValueError(f"No such collection {location_name}")
-        assert x.name == location_name
         return x
 
     def retrieve_locations(self):
@@ -505,9 +497,9 @@ class CollectionDB:
             .all()
         )
 
-    def retrieve_files_in_location(self,location):
-        files = File.objects.filter(locations__contains=location).all()
-        return(files)
+    def retrieve_files_in_location(self,location_name):
+        files = File.objects.filter(locations__name=location_name).all()
+        return files
 
     def retrieve_CFA_directory(self):
         """
@@ -532,39 +524,30 @@ class CollectionDB:
             file = File.objects.filter(name__contains=match).all()
         return file
 
-    def retrieve_files_in_collection(self, collection, match=None, replicants=False):
+    def retrieve_files_in_collection(self, collection, match=None, replicants=True):
         """
-        Return a list of files in a particular collection, possibly including those
-        which match a particular string and/or are replicants.
-        #FIXME: Note exactly sure what this definition of "replicants" is
+        Return a list of files in a particular <collection>, possibly including those
+        where something in the file name or path matches a particular string <match>
+        and/or are replicants. The default <replicants=True> returns all files,
+        if <replicants=False> only those files within a collection which have only
+        one location are returned.
         """
-        # do all the query combinations separately, likely to be more efficient ...
+        
         dbcollection = self.retrieve_collection(collection)
-        if match is None and replicants is False:
+        
+        if match is None and replicants is True:
             return dbcollection.files.all()
-        elif match and replicants is False:
+        
+        if match:
             files = dbcollection.files.filter(Q(name__contains=match) | Q(path__contains=match))
-            return files
-        elif replicants and match is None:
-            files = (File.objects.filter(collection=collection).all())
-            return files
         else:
-            m = f"%{match}%"
-            # FIXME this one too (WHAT IS THIS DOING? BNL DOES NOT KNOW)
-            files = (
-                self.session.query(File)
-                .filter(
-                    
-                    File.in_collections.any(Collection.name == collection),
-                    (Q(File.name.like(m)) | Q(File.path.like(m))),
-                    
-                )
-                .join(File.replicas)
-                .group_by(File)
-                .all()
-            )
-            # TODO add checksum here
-            return files
+            files = dbcollection.files
+        
+        if replicants:
+            return files.all()
+        else:
+            return files.annotate(location_count=Count('locations')).filter(location_count=1).all()
+
 
     def retrieve_files_from_variables(self, variables):
         files = File.objects.filter(variable__in=variables)
@@ -777,8 +760,7 @@ class CollectionDB:
             c.delete()
 
         elif files:
-            raise CollectionError(
-                collection_name, f"not empty (contains {len(files)} files)"
+            raise PermissionError(f"Cannot delete: {collection_name} not empty (contains {len(files)} files)"
             )
         else:
             c = self.retrieve_collection(collection_name)
@@ -913,12 +895,27 @@ class CollectionDB:
 
     def upload_file_to_collection(self, location, collection, f, lazy=0, update=True):
         """
-        Add a (potentially) new file <f> from <location> into the database, and add details to <collection>
-        (both of which must already be known to the system).
+        Convenience API to upload_files_to_collection, simply wraps <f> into a list
+        and calls upload_files_to_collection. See that function for explanation of
+        arguments.
+        """
+        return self.upload_files_to_collection(
+            self, location, collection, [f], lazy, update=True, progress=False )[0]
+        
+      
+    def upload_files_to_collection(self, location, collection, files, 
+                                   lazy=0, update=True, progress=False):
+        """
+        Add a list of (potentially) new files <files> from <location> into the database, 
+        and add details to <collection> (both of which must already be known to the system).
 
-        The assumption here is that the file is _new_, as otherwise we would be us using
+        The assumption here is that each file is _new_, as otherwise we would be using
         organise to put the file into a collection. However, depending on the value
         of update, we can decide whether or not to enforce that assumption.
+
+        for each <f> in <files>, <f> is a dictionary of properties of the file. 
+        The minimum set of properties are name, path, and size. format and checksum are optional. 
+        format is inferred from the full path if it is not provided as a dictionary entry.
 
         We check that assumption, by looking for
 
@@ -928,73 +925,9 @@ class CollectionDB:
 
         If we do find existing files, and <update> is True, then we will simply add
         a link to the new file as a replica. If <update> is False, we raise an error.
-        """
-        try:
-            c = Collection.objects.get(name=collection)
-            loc = Location.objects.get(name=location)
-        except Collection.DoesNotExist:
-            raise ValueError("Collection not yet available in database")
-        except Location.DoesNotExist:
-            raise ValueError("Location not yet available in database")
-
-        if "checksum" not in f:
-            f["checksum"] = "None"
-        name, path, size, checksum = f["name"], f["path"], f["size"], f["checksum"]
-        c.volume += f["size"]
-        try:
-            if lazy == 0:
-                check = self.retrieve_file(path, name)
-            elif lazy == 1:
-                check = self.retrieve_file(path, name, size=size)
-            elif lazy == 2:
-                check = self.retrieve_file(path, name, checksum=checksum)
-            else:
-                raise ValueError(f"Unexpected value of lazy {lazy}")
-        except FileNotFoundError:
-            check = False
-
-        if check:
-            if not update:
-                raise ValueError(
-                    f"Cannot upload file {os.path.join(path, name)} as it already exists"
-                )
-            else:
-                check.replicas.add(loc)
-                c.files.add(check)
-        else:
-            try:
-                fmt = f["format"]
-            except KeyError:
-                fmt = os.path.splitext(name)[1]
-            f = File(
-                name=name,
-                path=path,
-                checksum=checksum,
-                size=size,
-                format=fmt,
-            )
-            f.save()
-            f.replicas.add(loc)
-            c.files.add(f)
-            loc.holds_files.add(f)
-            c.volume += f.size
-            loc.volume += f.size
-            loc.holds_files.add(f)
-            print(loc.holds_files)
-            loc.save()
-            c.save()
-            f.save()
-
-    def upload_files_to_collection(
-        self, location, collection, files, lazy=0, update=True
-    ):
-        """
-        Add new files which exist at <location> to a <collection>. Both
-        location and collection must already exist.
-
-        <files>: list of file dictionaries
-            {name:..., path: ..., checksum: ..., size: ..., format: ...}
-
+        
+        if <progress> is true, a progress bar is shown
+        
         """
 
         try:
@@ -1004,10 +937,15 @@ class CollectionDB:
             raise ValueError("Collection not yet available in database")
         except Location.DoesNotExist:
             raise ValueError("Location not yet available in database")
-        for f in tqdm(files):
+        results = []
+        if progress:
+            files = tqdm(files)
+        for f in files:
+            name, path, size = f["name"], f["path"], f["size"]
             if "checksum" not in f:
                 f["checksum"] = "None"
-            name, path, size, checksum = f["name"], f["path"], f["size"], f["checksum"]
+            if "format" not in f:
+                f["format"] = os.path.splitext(name)[1]
             check = False
             try:
                 if lazy == 0:
@@ -1015,7 +953,7 @@ class CollectionDB:
                 elif lazy == 1:
                     check = self.retrieve_file(path, name, size=size)
                 elif lazy == 2:
-                    check = self.retrieve_file(path, name, checksum=checksum)
+                    check = self.retrieve_file(path, name, checksum=f["checksum"])
                 else:
                     raise ValueError(f"Unexpected value of lazy {lazy}")
             except FileNotFoundError:
@@ -1027,45 +965,25 @@ class CollectionDB:
                         f"Cannot upload file {os.path.join(path, name)} as it already exists"
                     )
                 else:
-                    try:
-                        fmt = f["format"]
-                    except KeyError:
-                        fmt = os.path.splitext(name)[1]
-                    f, created = File.objects.get_or_create(
-                        name=name,
-                        path=path,
-                        checksum=checksum,
-                        size=size,
-                        format=fmt,
-                    )
-                    f.replicas.add(loc)
-                    c.files.add(f)
-                    c.volume += f.size
-                    loc.holds_files.add(f)
-                    loc.volume += f.size
-
+                    file, created = File.objects.get_or_create(**f)
+                    if created:
+                        raise RuntimeError(f'Unexpected additional file created {f}')
             else:
-                try:
-                    fmt = f["format"]
-                except KeyError:
-                    fmt = os.path.splitext(name)[1]
-                f, created = File.objects.get_or_create(
-                    name=name,
-                    path=path,
-                    checksum=checksum,
-                    size=size,
-                    format=fmt,
-                )
-                c.volume += f.size
-                f.replicas.add(loc)
-                c.files.add(f)
-                f.replicas.add(loc)
-                loc.holds_files.add(f)
-                loc.volume += f.size
-                f.save()
+                file, created = File.objects.get_or_create(**f) 
+                if not created:
+                    raise RuntimeError(f'Unexpected failure to create file {f}')
+                  
+            c.volume += file.size
+            c.files.add(file)
+            file.locations.add(loc)
+            loc.volume += file.size
+            file.save()
+            # not doing anything with f.replicas right now
+            results.append(file)
 
         c.save()
         loc.save()
+        return results
 
     def remove_file_from_collection(
         self, collection, file_path, file_name, checksum=None
@@ -1078,9 +996,7 @@ class CollectionDB:
         f = self.retrieve_file(file_path, file_name)
         c = self.retrieve_collection(collection)
         if f not in c.files.all():
-            raise CollectionError(
-                collection, f" - file {file_path}/{file_name} not present!"
-            )
+            raise ValueError(f"{collection} - file {file_path}/{file_name} not present!")
         else:
             c.files.remove(f)
             c.volume -= f.size

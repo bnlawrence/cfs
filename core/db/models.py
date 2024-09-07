@@ -48,6 +48,10 @@ class Location(models.Model):
     volume = models.IntegerField()
     protocols = models.ManyToManyField(Protocol)
     holds_files = models.ManyToManyField("File")
+    
+    @property
+    def protocolset(self):
+        return self.protocols.all()
 
 
 class File(models.Model):
@@ -61,9 +65,21 @@ class File(models.Model):
     format = models.CharField(max_length=256, default="Unknown format")
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=256)
-    locations = models.ManyToManyField(Location, related_name="filelocations")
-    replicas = models.ManyToManyField(Location)
+    # Files may be found in multiple locations, and there may be 
+    # multiple copies in different collections in one location, but
+    # don't count them as extras
+    locations = models.ManyToManyField(Location)
 
+    def __repr__(self):
+        locations = ','.join([x.name for x in self.locations.all()])
+        return f"{self.name}({locations})"
+    
+    def dump(self):
+        """ Provide a comprehensive view of this file """
+        s = f"{self.name} ({self.format},{self.size}, checksum: {self.checksum}[{self.checksum_method}])\n"
+        s += f"[{self.path}]] is in locations:\n"
+        s += '\n'.join([x.name for x in self.locations.all()])
+        return s
 
 class Tag(models.Model):
     class Meta:
