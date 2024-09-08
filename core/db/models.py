@@ -55,6 +55,22 @@ class Location(models.Model):
 
 
 class File(models.Model):
+    """
+    Files are the physical manifestation that we have to manage, so
+    we need a bit of language. Each entry in the file table is 
+    one logical file as instantiated in one or more locations, but that's
+    not enough to understand what is going on in "cfstore" thinking.
+    This file entity keeps track of the presence of this file in
+    various locations, but NOT, the presence of the file in multiple
+    collections. Collections know what files they contain.
+
+    It is possible for one logical file to have more than one physical
+    representation in one storage location, but we don't care about thos
+    extra physical copies beyone ensuring that we do not delete a 
+    collection which has the last reference to a file in a location,
+    we don't allow that to happen. 
+
+    """
     class Meta:
         app_label = "db"
 
@@ -67,10 +83,11 @@ class File(models.Model):
     name = models.CharField(max_length=256)
     # Files may be found in multiple locations, and there may be 
     # multiple copies in different collections in one location, but
-    # don't count them as extras
+    # don't count them as extras. 
     locations = models.ManyToManyField(Location)
 
-    def __repr__(self):
+    
+    def __str__(self):
         locations = ','.join([x.name for x in self.locations.all()])
         return f"{self.name}({locations})"
     

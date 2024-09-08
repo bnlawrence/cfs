@@ -212,7 +212,19 @@ def test_file_match_and_replicants(test_db):
     fset = test_db.retrieve_files_in_collection('tdummy2', match='22', replicants=True)
     assert len(fset) == 1
     fset = test_db.retrieve_files_in_collection('tdummy1', replicants=False, match='file2')
-    assert len(fset) == 0 # of the four it would be without the match!
+    assert len(fset) == 0 
+
+def test_locate_files_in_other_collections_as_well(test_db):
+    """ 
+    At this point there ought to be ten files in fdummy3, 3 of which are duplicated in tdummy3.
+    This query tests that we recover from fdummy3 those files which are also in tdummy3
+    """
+    fset = [f.name for f in test_db.retrieve_files_in_collection('tdummy3')]
+    gset = test_db.retrieve_files_in_collection('fdummy3')
+    assert len(gset) > len(fset)
+    files = [f.name for f in test_db.retrieve_files_in_collection_and_elsewhere('fdummy3',by_properties=False)]
+    assert files == fset
+    
 
 def test_locations(test_db):
     """
@@ -250,49 +262,46 @@ def test_new_protocol(test_db):
         locp = [p.name for p in dloc.protocolset]
         assert newp in locp
 
-def test_locate_replicants():
+def NOtest_delete_file_from_collection():
     raise NotImplementedError
 
-def test_delete_file_from_collection():
+def NOtest_delete_collection():
     raise NotImplementedError
 
-def test_delete_collection():
+def NOtest_delete_location():
     raise NotImplementedError
 
-def test_delete_location():
-    raise NotImplementedError
-
-def test_deleting_tags():
+def NOtest_deleting_tags():
     pass
        
-def test_save_as_collection():
+def NOtest_save_as_collection():
     pass
 
-def test_retrieve_files_by_name():
+def NOtest_retrieve_files_by_name():
     pass
 
-def test_retrieve_file_if_present():
+def NOtest_retrieve_file_if_present():
     pass
 
-def test_retrieve_files_which_match():
+def NOtest_retrieve_files_which_match():
     pass
 
-def test_retrieve_or_make_file():
+def NOtest_retrieve_or_make_file():
     pass
     
-def test_delete_file_from_variables():
+def NOtest_delete_file_from_variables():
     pass
     
-def test_retrieve_files_from_variables():
+def NOtest_retrieve_files_from_variables():
     pass
     
-def test_directory_stuff():
+def NOtest_directory_stuff():
     pass
 
-def test_add_cell_method(test_db):
+def NOtest_add_cell_method(test_db):
     # also need to do other cell_method stuff
     pass
 
-def test_add_variable_from_file(test_db):
+def NOtest_add_variable_from_file(test_db):
     pass
 

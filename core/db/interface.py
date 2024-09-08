@@ -1,7 +1,7 @@
 import os
 import sys
 
-from django.db.models import Q, Count
+from django.db.models import Q, Count,OuterRef, Subquery
 from django import template
 
 from tqdm import tqdm
@@ -198,124 +198,44 @@ class CollectionDB:
         t.save()
         return t,s
 
-    def locate_replicants(
-        self,
-        collection_name,
-        strip_base="",
-        match_full_path=False,
-        try_reverse_for_speed=False,
-        check="Both",
-    ):
+    def retrieve_files_in_collection_and_elsewhere(self, collection_name, by_properties=False):
         """
-        Locate copies of a file across collections
-        strip_base - remove given string from the file string
-        match_full_path - find only if the full path matches if true, otherwise only filename
-        try_reverse_for_speed - optimization approach that does not yet work and is not implemented
-        check - check for "name", "size" or "both", checksum needs to be implemented
+        For a given collection, find all its files which are also in other collections.
+        The fast version of this (by_properties=False) simply looks at the files which
+        are not unique to this collection. The slow version will look for file duplicates
+        which match on properties (name, size, checksum). 
+        That could be excrutiatingly slow.  
+        We may need indexes for at least 'name' and 'checksum'.
         """
-
-        def strip(path, stem):
-            """If path starts with stem, return path without the stem, otherwise return the path"""
-            if path.startswith(stem):
-                return path[len(stem) :]
-            else:
-                return path
-
-        if try_reverse_for_speed:
-            raise NotImplementedError
+        #FIXME: replacement for locate_replicants, there will be consequences
+        collection = self.retrieve_collection(collection_name)
+        files = collection.files.all()
+        if not by_properties:
+            # We go from files in collection, rather than files in general, because 
+            # annotating all files will be expensive. It's bad enough we have to do this.
+            # this doesn't work because django has been too clever
+            # files = files.annotate(collection_count=Count('collection'))
+   
+            collection_count_subquery = Collection.objects.filter(
+                files=OuterRef('pk')).values('files').annotate(count=Count('id')).values('count')
+    
+            files = files.annotate(collection_count=
+                                  Subquery(collection_count_subquery)).filter(
+                                      collection_count__gt=1).distinct()
         else:
-            # basic algorithm is to grab all the candidates, and then do a search on those.
-            # a SQL wizard would do better.
-            c = self.retrieve_collection(collection_name)
-            candidates = self.retrieve_files_in_collection(collection_name)
-            if check.lower() == "both":
-                if strip_base:
-                    if match_full_path:
-                        # likely occurs because ingest required same checksum and/or size and these were not
-                        # known at ingest time.
-                        possibles = [
-                            File.objects.filter(name=f.name, path=f.path, size=f.size)
-                            for f in candidates
-                        ]
-                    else:
-                        possibles = [
-                            File.objects.filter(
-                                name=f.name,
-                                size=f.size,
-                            )
-                            for f in candidates
-                        ]
-                else:
-                    if match_full_path:
-                        # likely occurs because ingest required same checksum and/or size and these were not
-                        # known at ingest time.
-                        possibles = [
-                            File.objects.filter(name=f.name, path=f.path, size=f.size)
-                            for f in candidates
-                        ]
-                    else:
-                        possibles = [
-                            File.objects.filter(name=f.name, size=f.size)
-                            for f in candidates
-                        ]
-            if check.lower() == "name":
-                if strip_base:
-                    if match_full_path:
-                        # likely occurs because ingest required same checksum and/or size and these were not
-                        # known at ingest time.
-                        possibles = [
-                            File.objects.filter(
-                                name=f.name, path=strip(f.path, strip_base), size=f.size
-                            )
-                            for f in candidates
-                        ]
-                    else:
-                        possibles = [
-                            File.objects.filter(name=strip(f.name, strip_base))
-                            for f in candidates
-                        ]
-                else:
-                    if match_full_path:
-                        # likely occurs because ingest required same checksum and/or size and these were not
-                        # known at ingest time.
-                        possibles = [
-                            File.objects.filter(name=f.name, path=(f.path))
-                            for f in candidates
-                        ]
-                    else:
-                        possibles = [
-                            File.objects.filter(name=f.name) for f in candidates
-                        ]
+            # this can't be quick without indexes for all these
+            # it might be best to index just a couple of those 
+            # and do it in two steps. 
+            allfiles = File.objects.all()
+            duplicates = allfiles.values('name','size','checksum').annotate(
+                        file_count=Count('id'))
+            #print([(d['name'],d['file_count']) for d in duplicates])
+            duplicates = duplicates.filter(file_count__gt=1)
+            files = files.filter(name__in=[item['name'] for item in duplicates],
+                                 size__in=[item['size'] for item in duplicates],
+                                 checksum__in=[item['checksum'] for item in duplicates])
+        return files
 
-            if check.lower() == "size":
-                if strip_base:
-                    if match_full_path:
-                        # likely occurs because ingest required same checksum and/or size and these were not
-                        # known at ingest time.
-                        possibles = [
-                            File.objects.filter(size=f.size) for f in candidates
-                        ]
-
-                    else:
-                        possibles = [
-                            File.objects.filter(name=f.name, size=f.size)
-                            for f in candidates
-                        ]
-
-                else:
-                    if match_full_path:
-                        # likely occurs because ingest required same checksum and/or size and these were not
-                        # known at ingest time.
-                        possibles = [
-                            File.objects.filter(name=f.name, path=f.path)
-                            for f in candidates
-                        ]
-
-                    else:
-                        possibles = [
-                            File.objects.filter(size=f.size) for f in candidates
-                        ]
-        return candidates, possibles
 
     def retrieve_collection(self, collection_name):
         """
