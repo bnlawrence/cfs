@@ -198,6 +198,7 @@ class CollectionDB:
         t.save()
         return t,s
 
+    
     def retrieve_files_in_collection_and_elsewhere(self, collection_name, by_properties=False):
         """
         For a given collection, find all its files which are also in other collections.
@@ -667,25 +668,18 @@ class CollectionDB:
         variables = Variable.objects.filter(in_collection__in=collection)
         return variables
 
-    def delete_collection(self, collection_name, force=False):
+    def delete_collection(self, collection_name, force=False, unique_only=True):
         """
-        Remove a collection from the database, ensuring all files have already been removed first.
+        Remove a collection from the database, ensuring all unique files have already been removed first
+        unless force is true. If force is true, delete_colletion will also delete all the unique files
+        in the collection. If not unique_only, then all files will be deleted from the collection, even
+        those which appear in other collections. Be careful.
         """
-        files = self.retrieve_files_in_collection(collection_name)
-        if files and force:
-            for f in files:
-                self.delete_file_from_collection(collection_name, f.path + "/" + f.name)
-            c = self.retrieve_collection(collection_name)
-            c.save()
-            c.delete()
+        
+        c = self.retrieve_collection(collection_name)
+        c.do_empty(force, unique_only)
+        c.delete()
 
-        elif files:
-            raise PermissionError(f"Cannot delete: {collection_name} not empty (contains {len(files)} files)"
-            )
-        else:
-            c = self.retrieve_collection(collection_name)
-            c.save()
-            c.delete()
 
     def delete_location(self, location_name):
         """
@@ -751,16 +745,6 @@ class CollectionDB:
             variable.in_collection.add(c)
             variable.save()
             c.save()
-
-    def collection_info(self, name):
-        """
-        Return information about a collection
-        """
-        try:
-            c = Collection.objects.get(name=name)
-        except Collection.DoesNotExist:
-            raise ValueError(f"No such collection {name}")
-        return c.name,c.description,c.files.all()
 
     def byte_format(self, num, suffix="B"):
         for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
@@ -828,6 +812,7 @@ class CollectionDB:
         """
         Add a list of (potentially) new files <files> from <location> into the database, 
         and add details to <collection> (both of which must already be known to the system).
+        Each file is described by a dictioary of properties.
 
         The assumption here is that each file is _new_, as otherwise we would be using
         organise to put the file into a collection. However, depending on the value
@@ -861,11 +846,12 @@ class CollectionDB:
         if progress:
             files = tqdm(files)
         for f in files:
+            p = {k:v for k,v in f.items()}
             name, path, size = f["name"], f["path"], f["size"]
             if "checksum" not in f:
-                f["checksum"] = "None"
+                p["checksum"]="Unknown"
             if "format" not in f:
-                f["format"] = os.path.splitext(name)[1]
+                p["format"] = os.path.splitext(name)[1]
             check = False
             try:
                 if lazy == 0:
@@ -873,7 +859,7 @@ class CollectionDB:
                 elif lazy == 1:
                     check = self.retrieve_file(path, name, size=size)
                 elif lazy == 2:
-                    check = self.retrieve_file(path, name, checksum=f["checksum"])
+                    check = self.retrieve_file(path, name, checksum=p["checksum"])
                 else:
                     raise ValueError(f"Unexpected value of lazy {lazy}")
             except FileNotFoundError:
@@ -885,14 +871,16 @@ class CollectionDB:
                         f"Cannot upload file {os.path.join(path, name)} as it already exists"
                     )
                 else:
-                    file, created = File.objects.get_or_create(**f)
+                    file, created = File.objects.get_or_create(**p)
                     if created:
                         raise RuntimeError(f'Unexpected additional file created {f}')
             else:
-                file, created = File.objects.get_or_create(**f) 
+                file, created = File.objects.get_or_create(**p) 
                 if not created:
                     raise RuntimeError(f'Unexpected failure to create file {f}')
                   
+            if name.startswith('rem'):
+                print('checking', p['size'], file.size, c.name, c.volume)
             c.volume += file.size
             c.files.add(file)
             file.locations.add(loc)
@@ -902,8 +890,42 @@ class CollectionDB:
             results.append(file)
 
         c.save()
+        if name.startswith('rem'):
+            print('checking done ', c.name, c.volume)
         loc.save()
         return results
+    
+    def file_remove_from_collection(self, collection_instance, file_instance):
+        """ 
+        Remove a file instance from a collection instance
+        """
+        collection_instance.files.remove(file_instance)
+
+    def file_remove_from_named_collection(self,  collection_name, file_instance,):
+        """ 
+        Remove a file instance from a collection with collection identified by
+        name.
+        """
+        c = self.retrieve_collection(collection_name)
+        self.file_remove_from_collection(c, file_instance)
+
+    def file_retrieve_by_properties(self, name=None, path=None, size=None, checksum=None, unique=True):
+        """ 
+        Find a file instance by propeties. If unique, raise an error if the properties 
+        provided do not result in a unique file, otherwise return all matching files.
+        Raise an error if no such file.
+        """
+        properties={}
+        for k,v in {'name':name, 'path':path, 'size':size, 'checksum':checksum}.items():
+            if v is not None:
+                properties[k]=v
+        fset = File.objects.filter(**properties).all()
+        if len(fset) == 0:
+            raise ValueError(f'No file found for {properties}')
+        elif len(fset) > 1:
+            if unique:
+                raise ValueError(f'{properties} describes multiple files')
+        return fset[0]
 
     def remove_file_from_collection(
         self, collection, file_path, file_name, checksum=None
@@ -913,6 +935,7 @@ class CollectionDB:
         <collection>. Raise an error if already removed from collection (or, I suppose, if it was never
         in that collection, the database wont know!)
         """
+        print('Deprecated: replace with file_remove_from_collection with file instance')
         f = self.retrieve_file(file_path, file_name)
         c = self.retrieve_collection(collection)
         if f not in c.files.all():
@@ -929,5 +952,4 @@ class CollectionDB:
         """
         return self.engine.table_names()
 
-    def delete_collection_with_files(collection):
-        pass
+

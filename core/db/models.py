@@ -1,4 +1,9 @@
 from django.db import models
+from django.db.models import Q, Count,OuterRef, Subquery
+from django.db.models.signals import pre_delete, m2m_changed
+
+from django.dispatch import receiver
+
 
 def sizeof_fmt(num, suffix="B"):
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
@@ -47,7 +52,6 @@ class Location(models.Model):
     name = models.CharField(max_length=256)
     volume = models.IntegerField()
     protocols = models.ManyToManyField(Protocol)
-    holds_files = models.ManyToManyField("File")
     
     @property
     def protocolset(self):
@@ -63,6 +67,8 @@ class File(models.Model):
     This file entity keeps track of the presence of this file in
     various locations, but NOT, the presence of the file in multiple
     collections. Collections know what files they contain.
+    #FIXME: Both collections and locations handle deletion of files
+    carefully!
 
     It is possible for one logical file to have more than one physical
     representation in one storage location, but we don't care about thos
@@ -86,7 +92,6 @@ class File(models.Model):
     # don't count them as extras. 
     locations = models.ManyToManyField(Location)
 
-    
     def __str__(self):
         locations = ','.join([x.name for x in self.locations.all()])
         return f"{self.name}({locations})"
@@ -97,6 +102,22 @@ class File(models.Model):
         s += f"[{self.path}]] is in locations:\n"
         s += '\n'.join([x.name for x in self.locations.all()])
         return s
+    
+    def delete(self,*args,**kwargs):
+        """ When a file is deleted, we need to make sure that the volume associated with
+        it is removed from any collections and locations """
+        for c in self.collection_set.all():
+            c.volume -= self.size
+            c.save()
+        for l in self.locations.all():
+            l.volume -= self.size
+            l.save()
+
+@receiver(pre_delete, sender=File)
+def on_file_delete(sender, instance, **kwargs):
+    # This will be executed before a File object is deleted
+    instance.delete()  # Call the custom file deletion logic
+
 
 class Tag(models.Model):
     class Meta:
@@ -142,8 +163,8 @@ class Collection(models.Model):
     def __delitem__(self, key):
         del self._proxied[key]
 
-    def __repr__(self):
-        return self.name + ":" + str(self.volume)
+    def __str__(self):
+        return f"{self.name} ({self.n_files},{sizeof_fmt(self.volume)})"
 
     _proxied = models.JSONField()
     name = models.CharField(max_length=256, unique=True)
@@ -154,6 +175,100 @@ class Collection(models.Model):
     files = models.ManyToManyField(File)
     properties = models.ManyToManyField(CollectionProperty)
     tags = models.ManyToManyField(Tag)
+
+    @property
+    def n_files(self):
+        return self.files.count()
+    
+    def unique_files(self):
+        """ 
+        Return a query set of all those files in this collection that are 
+        only in this collection
+        """
+        # this doesn't work because django has been too clever
+        # files = files.annotate(collection_count=Count('collection'))
+        collection_count_subquery = Collection.objects.filter(
+                files=OuterRef('pk')).values('files').annotate(count=Count('id')).values('count')
+    
+        files = self.files.annotate(collection_count=
+                                  Subquery(collection_count_subquery)).filter(
+                                      collection_count=1).all()
+        return files
+
+    def do_empty(self, delete_files=False, unique_only=True):
+        """ 
+        Remove all files from collection, possibly deleting them in the process 
+        depending on the arguments. Normally used as part of deletion logic elsewhere. 
+        
+        1: <delete_files=T><unique_only=T> Delete just the unique files. 
+        Raise an error if there are non-unique files in the collection.
+        
+        2: <delete_files=T><unique_only=F> Delete all the files in the collection.
+        This will delete files from other collections too. Be careful.
+        
+        3: <delete_files=F><unique_only=T> This should raise an error if there are any
+        unique files in the collection, otherwise it will remove files from the 
+        collection which (will still) exist in other collections.
+        
+        4: <delete_files=F><unique_only=F> Will raise an error if there are any files 
+        in the collection at all.
+        """
+        all_files = self.files.all()
+        unique_files = self.unique_files()
+        n_unique, n_all  = len(unique_files), len(all_files)
+        non_unique = n_all > n_unique
+        if delete_files:
+            if unique_only: # option 1
+                if non_unique:
+                    raise PermissionError(
+                        f'Cannot empty {self.name} (contains {n_unique} non-unique files)')
+                else:
+                    unique_files.delete()
+            else:  # option 2
+                all_files.delete()
+        else:
+            if unique_only: # option 3
+                if n_unique == 0:
+                    self.files.remove(*all_files)
+                else:
+                    raise PermissionError(
+                        f'Cannot empty {self.name} (contains {n_unique} unique files)')
+            else: # option 4
+                if n_all > 0:
+                    raise PermissionError(
+                        f'Cannot empty {self.name} (contains {n_all} files)')
+
+    def delete(self,*args,**kwargs):
+        if self.n_files  > 0 :
+            raise PermissionError(f'Cannot delete non-empty collection {self.name} (has {self.n_files} files)')
+        super().delete(*args,**kwargs)
+
+@receiver(m2m_changed,sender=Collection.files.through)
+def intercept_file_removal(sender, instance, action, reverse, model, pk_set, **kwargs):
+    """
+    This function intercepts when a file is being removed from a collection. We are trying
+    to ensure that no file is removed from a collection if it exists only in that
+    collection. Such files can only be removed by a forced delete (see do_empty).
+    
+    Arguments:
+    - sender: The model managing the many-to-many relationship (Collection.files.through).
+    - instance: The Collection instance from which files are being removed.
+    - action: The type of action ('pre_add', 'post_add', 'pre_remove', 'post_remove', etc.).
+    - reverse: If True, reverse relation is being affected (related model's field instead).
+    - model: The model that is being added or removed (File).
+    - pk_set: The primary key set of the objects being added or removed.
+    """
+    # We're only interested in 'pre_remove'
+    if action == 'pre_remove':
+        for pk in pk_set:
+            file = File.objects.get(pk=pk)
+            collection_count = file.collection_set.count()
+            if collection_count <= 1:  # Only linked to the current collection
+                raise PermissionError(
+                    f"File '{file.name}' cannot be removed from collection '{instance.name}' because it is unique to this collection."
+                )
+            instance.volume -= file.size
+
 
 
 class Relationship(models.Model):

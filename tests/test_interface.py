@@ -3,7 +3,6 @@ from pathlib import Path
 
 import pytest
 
-
 def _dummy(db, location='testing', collection_stem="fdummy", files_per_collection=10):
     """ 
     Set up a dummy dataset in db with accessible structure for testing
@@ -20,7 +19,8 @@ def test_db(tmp_path_factory):
     """ 
     Get ourselves a db to work with. Note that this database is progressively
     modified by all the tests that follow. So if you're debugging tests, you 
-    have to work though them consecutively.
+    have to work though them consecutively. Note that the order is not 
+    necessarily as deterministic
     """
     tmp_path = tmp_path_factory.mktemp('testing_interface')
     dbfile = str(Path(tmp_path)/'test.db')
@@ -38,9 +38,9 @@ def test_db():
    
 def test_create_collection(test_db):
     kw = {'resolution': 'N512', 'workspace': 'testws'}
-    test_db.create_collection('mrun1', 'no real description', kw)
-    info = test_db.collection_info('mrun1')
-    print(info)
+    info = test_db.create_collection('mrun1', 'no real description', kw)
+    assert info.name == 'mrun1'
+    assert info.description == 'no real description'
 
 def test_unique_collection(test_db):
     kw = {'resolution': 'N512', 'workspace': 'testws'}
@@ -56,6 +56,8 @@ def test_fileupload(test_db):
     files = [{'path': '/somewhere/in/unix_land', 'name': f'filet{i}', 'size': 10} for i in range(10)]
     test_db.upload_files_to_collection('testing', 'mrun3', files)
     assert len(test_db.retrieve_files_in_collection('mrun3')) == len(files)
+    c = test_db.retrieve_collection('mrun3')
+    assert c.volume==100
 
 def test_add_and_retrieve_tag(test_db):
     """
@@ -141,41 +143,30 @@ def test_add_relationships(test_db):
     x = test_db.retrieve_relationships('dummy3', 'child_of')
     assert ['dummy3', ] == [j.subject.name for j in x]
 
-def test_delete_collection(test_db):
-    """
-    Make sure delete collection works and respects files in collection
-    """
-    with pytest.raises(PermissionError) as context:
-        test_db.delete_collection('fdummy1')
-    files = test_db.retrieve_files_in_collection('fdummy1')
-    for f in files:
-        test_db.remove_file_from_collection('fdummy1', f.path, f.name)
-    test_db.delete_collection('fdummy1')
-    with pytest.raises(ValueError) as context:
-        c = test_db.retrieve_collection('fdummy1')
-
 def test_remove_from_collection(test_db):
     """
     Test removing file from a collection
     """
-    path = '/somewhere/in/unix_land'
-    files = test_db.retrieve_files_in_collection('fdummy2')
-    # first let's make sure the right thing happens if the file doesn't exist
-    with pytest.raises(FileNotFoundError):
-        test_db.remove_file_from_collection('fdummy2', path, 'abc123')
-    # if it isn't in the collection
-    with pytest.raises(ValueError):
-        test_db.remove_file_from_collection('fdummy2', path, 'file33')
-    files = test_db.retrieve_files_in_collection('fdummy2')
-    for f in files:
-        test_db.remove_file_from_collection('fdummy2', f.path, f.name)
-        # this checks it's no longer in the collection
-        with pytest.raises(ValueError):
-            test_db.remove_file_from_collection('dummy2', f.path, f.name)
-    # and this checks it still exists
-    for f in files:
-        f = test_db.retrieve_file(f.path, f.name)
+    test_db.create_collection('dcol1','for file testing')
+    test_db.create_collection('dcol2','for file testing')
+    dfiles = [{'path': '/bound/for/deletion', 'name': f'remfile{j}', 'size': 10} for j in range(3)]
+    test_db.upload_files_to_collection('testing','dcol1',dfiles[0:2])
+    # this should only add one new file
+    test_db.upload_files_to_collection('testing','dcol2',[dfiles[2]])
+    
+    files = [test_db.file_retrieve_by_properties(**f) for f in dfiles]
+    test_db.add_file_to_collection('dcol2',files[1],skipvar=True)
+   
 
+    # it's unique and can't be removed
+    with pytest.raises(PermissionError):
+        test_db.file_remove_from_named_collection('dcol1',files[0])
+    # it's ok to remove and we can remove it
+    assert files[1].collection_set.count()==2
+    test_db.file_remove_from_named_collection('dcol1',files[1])
+    assert files[1].collection_set.count()==1
+
+    
 def test_retrieve_file(test_db):
     """
     Test retrieving files
@@ -224,7 +215,15 @@ def test_locate_files_in_other_collections_as_well(test_db):
     assert len(gset) > len(fset)
     files = [f.name for f in test_db.retrieve_files_in_collection_and_elsewhere('fdummy3',by_properties=False)]
     assert files == fset
-    
+
+def test_delete_collection(test_db):
+    """ 
+    test deleting a collection with no files, with files only in it, and with
+    files which are duplicated. We expect the first to work, the second not
+    to work without the correct delete_file argument, and the third to work.
+    """
+    # This is now fully tested in test_counting
+    pass
 
 def test_locations(test_db):
     """
@@ -262,11 +261,21 @@ def test_new_protocol(test_db):
         locp = [p.name for p in dloc.protocolset]
         assert newp in locp
 
+
+def NOtest_handle_upload_duplicates():
+
+    acol1 = test_db.create_collection('acol1','for file testing')
+    acol2 = test_db.create_collection('acol2','for file testing')
+    files = [{'path': '/yeah/what', 'name': f'uptestfile{j}', 'size': 10} for j in range(3)]
+    test_db.upload_files_to_collection('testing','acol1',files[0:2])
+    # this should only add one new fiedl, but it currently adds two
+    test_db.upload_files_to_collection('testing','acol2',files[1:3])
+
+
 def NOtest_delete_file_from_collection():
     raise NotImplementedError
 
-def NOtest_delete_collection():
-    raise NotImplementedError
+
 
 def NOtest_delete_location():
     raise NotImplementedError
