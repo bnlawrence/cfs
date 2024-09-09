@@ -243,6 +243,9 @@ class Collection(models.Model):
             raise PermissionError(f'Cannot delete non-empty collection {self.name} (has {self.n_files} files)')
         super().delete(*args,**kwargs)
 
+    def list_files(self):
+        return self.name,[f.name for f in self.files.all()]
+
 @receiver(m2m_changed,sender=Collection.files.through)
 def intercept_file_removal(sender, instance, action, reverse, model, pk_set, **kwargs):
     """

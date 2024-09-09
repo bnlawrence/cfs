@@ -25,6 +25,8 @@ def test_unique_files_and_empty(tmp_path):
         c.save()
         for f in files: 
             c.files.add(f)
+            c.volume +=f.size
+        c.save()
         return c
     
     file1 = File(name='myfile1',path='/tmp/myfile1',size=1)
@@ -35,6 +37,8 @@ def test_unique_files_and_empty(tmp_path):
     file3.save()
     c1 = make_c('tcol1',[file1,file2])
     c2 = make_c('tcol2',[file2,file3])
+    #print(c1)
+    #print(c2)
 
     #### The following logic appears inside collection.unique_files()
     #### Ripped out here to fully understand what is going on.

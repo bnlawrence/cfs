@@ -7,10 +7,10 @@ def _dummy(db, location='testing', collection_stem="fdummy", files_per_collectio
     """ 
     Set up a dummy dataset in db with accessible structure for testing
     """
-    db.create_location(location)
+    db.location_create(location)
     for i in range(5):
         c = f'{collection_stem}{i}'
-        db.create_collection(c, 'no description', {})
+        db.collection_create(c, 'no description', {})
         files = [{'path': '/somewhere/in/unix_land', 'name': f'file{j}{i}', 'size': 10} for j in range(files_per_collection)]
         db.upload_files_to_collection(location, c, files)
 
@@ -36,27 +36,27 @@ def test_db():
     from core.db.interface import CollectionDB
     return CollectionDB()
    
-def test_create_collection(test_db):
+def test_collection_create(test_db):
     kw = {'resolution': 'N512', 'workspace': 'testws'}
-    info = test_db.create_collection('mrun1', 'no real description', kw)
+    info = test_db.collection_create('mrun1', 'no real description', kw)
     assert info.name == 'mrun1'
     assert info.description == 'no real description'
 
 def test_unique_collection(test_db):
     kw = {'resolution': 'N512', 'workspace': 'testws'}
-    test_db.create_collection('mrun2', 'no real description', kw)
+    test_db.collection_create('mrun2', 'no real description', kw)
     with pytest.raises(ValueError) as context:
-        test_db.create_collection('mrun2', 'no real description', kw)
+        test_db.collection_create('mrun2', 'no real description', kw)
     assert 'DB IntegrityError' in str(context)
 
 def test_fileupload(test_db):
     """ Test uploading files """
-    test_db.create_collection('mrun3', 'no real description', {})
-    test_db.create_location('testing')
+    test_db.collection_create('mrun3', 'no real description', {})
+    test_db.location_create('testing')
     files = [{'path': '/somewhere/in/unix_land', 'name': f'filet{i}', 'size': 10} for i in range(10)]
     test_db.upload_files_to_collection('testing', 'mrun3', files)
-    assert len(test_db.retrieve_files_in_collection('mrun3')) == len(files)
-    c = test_db.retrieve_collection('mrun3')
+    assert len(test_db.files_retrieve_in_collection('mrun3')) == len(files)
+    c = test_db.collection_retrieve('mrun3')
     assert c.volume==100
 
 def test_add_and_retrieve_tag(test_db):
@@ -64,10 +64,10 @@ def test_add_and_retrieve_tag(test_db):
     Need to add tags, and select by tags
     """
     tagname = 'test_tag'
-    test_db.create_tag(tagname)
+    test_db.tag_create(tagname)
     test_db.tag_collection('mrun1', tagname)
     test_db.tag_collection('mrun3', tagname)
-    tagged = test_db.retrieve_collections(tagname=tagname)
+    tagged = test_db.collections_retrieve(tagname=tagname)
     assert ['mrun1', 'mrun3'] == [x.name for x in tagged]
 
 def test_get_collections(test_db):
@@ -75,13 +75,13 @@ def test_get_collections(test_db):
     Test ability to get a subset of collections via name and/or description
     """
     for i in range(5):
-        test_db.create_collection(f'dummy{i}','no description', {})
-        test_db.create_collection(f'eg{i}','no description', {})
-    test_db.create_collection('dummy11','actual description',{})
-    assert len(test_db.retrieve_collections(name_contains='g')) == 5
-    assert len(test_db.retrieve_collections(description_contains='actual')) ==  1
+        test_db.collection_create(f'dummy{i}','no description', {})
+        test_db.collection_create(f'eg{i}','no description', {})
+    test_db.collection_create('dummy11','actual description',{})
+    assert len(test_db.collections_retrieve(name_contains='g')) == 5
+    assert len(test_db.collections_retrieve(description_contains='actual')) ==  1
     with pytest.raises(ValueError) as context:
-        test_db.retrieve_collections(description_contains='actual', name_contains='x')
+        test_db.collections_retrieve(description_contains='actual', name_contains='x')
     assert 'Invalid request' in str(context)
 
 def test_get_collection_fails(test_db):
@@ -89,13 +89,13 @@ def test_get_collection_fails(test_db):
     Make sure we handle a request for a non-existent collection gracefully
     """
     # expect an empty set, not an error for this one:
-    cset = test_db.retrieve_collections(name_contains='Fred')
+    cset = test_db.collections_retrieve(name_contains='Fred')
     assert len(cset) == 0
     with pytest.raises(ValueError) as context:
-        fset = test_db.retrieve_files_in_collection('Fred')
+        fset = test_db.files_retrieve_in_collection('Fred')
     assert 'No such collection' in str(context)
     with pytest.raises(ValueError) as context:
-        c = test_db.retrieve_collection('Fred')
+        c = test_db.collection_retrieve('Fred')
     assert 'No such collection' in str(context)
 
 def test_collection_properties(test_db):
@@ -104,10 +104,10 @@ def test_collection_properties(test_db):
     """
     choice = ['dummy2', 'dummy3']
     for c in choice:
-        cc = test_db.retrieve_collection(c)
+        cc = test_db.collection_retrieve(c)
         cc['color'] = 'green'
         cc.save()
-    r = test_db.retrieve_collections(facet=('color', 'green'))
+    r = test_db.collections_retrieve(facet=('color', 'green'))
     assert choice == [x.name for x in r]
 
 
@@ -117,51 +117,51 @@ def test_get_files_match(test_db):
     those in a collection that match a specfic string
     """
     _dummy(test_db)
-    files = test_db.retrieve_files_in_collection('fdummy3')
+    files = test_db.files_retrieve_in_collection('fdummy3')
     assert len(files) == 10
-    files = test_db.retrieve_files_in_collection('fdummy3', 'file13')
+    files = test_db.files_retrieve_in_collection('fdummy3', 'file13')
     assert len(files) == 1
-    files = test_db.retrieve_files_in_location('testing')
+    files = test_db.files_retrieve_in_location('testing')
 
 def test_add_relationship(test_db):
     """
     Make sure we can add relationships between collections which are symmetrical
     """
-    test_db.add_relationship('dummy1', 'dummy3', 'brother')
-    x = test_db.retrieve_relationships('dummy1','brother')
+    test_db.relationship_add('dummy1', 'dummy3', 'brother')
+    x = test_db.relationships_retrieve('dummy1','brother')
     assert 'dummy1' == x[0].subject.name
-    x = test_db.retrieve_relationships('dummy3', 'brother')
+    x = test_db.relationships_retrieve('dummy3', 'brother')
     assert len(x) == 0
 
 def test_add_relationships(test_db):
     """
     Make sure we can add and use assymetric relationships between collections
     """
-    test_db.add_relationships('dummy1', 'dummy3', 'parent_of', 'child_of')
-    x = test_db.retrieve_relationships('dummy1', 'parent_of')
+    test_db.relationships_add('dummy1', 'dummy3', 'parent_of', 'child_of')
+    x = test_db.relationships_retrieve('dummy1', 'parent_of')
     assert ['dummy1'] == [j.subject.name for j in x]
-    x = test_db.retrieve_relationships('dummy3', 'child_of')
+    x = test_db.relationships_retrieve('dummy3', 'child_of')
     assert ['dummy3', ] == [j.subject.name for j in x]
 
 def test_remove_from_collection(test_db):
     """
     Test removing file from a collection
     """
-    test_db.create_collection('dcol1','for file testing')
-    test_db.create_collection('dcol2','for file testing')
+    test_db.collection_create('dcol1','for file testing')
+    test_db.collection_create('dcol2','for file testing')
     dfiles = [{'path': '/bound/for/deletion', 'name': f'remfile{j}', 'size': 10} for j in range(3)]
     test_db.upload_files_to_collection('testing','dcol1',dfiles[0:2])
     # this should only add one new file
     test_db.upload_files_to_collection('testing','dcol2',[dfiles[2]])
     
     files = [test_db.file_retrieve_by_properties(**f) for f in dfiles]
-    test_db.add_file_to_collection('dcol2',files[1],skipvar=True)
-   
+    test_db.file_add_to_collection('dcol2',files[1],skipvar=True)
 
     # it's unique and can't be removed
     with pytest.raises(PermissionError):
         test_db.file_remove_from_named_collection('dcol1',files[0])
     # it's ok to remove and we can remove it
+
     assert files[1].collection_set.count()==2
     test_db.file_remove_from_named_collection('dcol1',files[1])
     assert files[1].collection_set.count()==1
@@ -174,9 +174,9 @@ def test_retrieve_file(test_db):
     path = '/somewhere/in/unix_land'
     # first let's make sure the right thing happens if the file doesn't exist
     with pytest.raises(FileNotFoundError) as context:
-        f = test_db.retrieve_file(path, 'abc123')
+        f = test_db.file_retrieve_by_properties(name='abc123')
     # now check we can find a particular file
-    f = test_db.retrieve_file(path, 'file01')
+    f = test_db.file_retrieve_by_properties(name='file01')
     assert f.name, 'file01'
 
 def test_file_replicants(test_db):
@@ -187,12 +187,12 @@ def test_file_replicants(test_db):
     """
     _dummy(test_db, location='pseudo tape', collection_stem="tdummy", files_per_collection=3)
     # now we need to see if these can be found, let's just look for the two replicas in dummy1
-    fset = test_db.retrieve_files_in_collection('tdummy1', replicants=True)
+    fset = test_db.files_retrieve_in_collection('tdummy1', replicants=True)
     assert len(fset) == 3
     assert fset[0].name == 'file01'
     # now that set should all be replicated in two locations, let's make sure we don't
     # get them back if we only want the ones in this location.
-    fset =  test_db.retrieve_files_in_collection('tdummy1', replicants=False)
+    fset =  test_db.files_retrieve_in_collection('tdummy1', replicants=False)
     assert len(fset) == 0
 
 def test_file_match_and_replicants(test_db):
@@ -200,9 +200,9 @@ def test_file_match_and_replicants(test_db):
     Test that we get the same results as file_replicants, but when we use
     a match as well 
     """
-    fset = test_db.retrieve_files_in_collection('tdummy2', match='22', replicants=True)
+    fset = test_db.files_retrieve_in_collection('tdummy2', match='22', replicants=True)
     assert len(fset) == 1
-    fset = test_db.retrieve_files_in_collection('tdummy1', replicants=False, match='file2')
+    fset = test_db.files_retrieve_in_collection('tdummy1', replicants=False, match='file2')
     assert len(fset) == 0 
 
 def test_locate_files_in_other_collections_as_well(test_db):
@@ -210,10 +210,10 @@ def test_locate_files_in_other_collections_as_well(test_db):
     At this point there ought to be ten files in fdummy3, 3 of which are duplicated in tdummy3.
     This query tests that we recover from fdummy3 those files which are also in tdummy3
     """
-    fset = [f.name for f in test_db.retrieve_files_in_collection('tdummy3')]
-    gset = test_db.retrieve_files_in_collection('fdummy3')
+    fset = [f.name for f in test_db.files_retrieve_in_collection('tdummy3')]
+    gset = test_db.files_retrieve_in_collection('fdummy3')
     assert len(gset) > len(fset)
-    files = [f.name for f in test_db.retrieve_files_in_collection_and_elsewhere('fdummy3',by_properties=False)]
+    files = [f.name for f in test_db.files_retrieve_in_collection_and_elsewhere('fdummy3',by_properties=False)]
     assert files == fset
 
 def test_delete_collection(test_db):
@@ -229,21 +229,21 @@ def test_locations(test_db):
     """
     Test we can see the locations known to the DB
     """
-    locs = [l.name for l in test_db.retrieve_locations()]
+    locs = [l.name for l in test_db.locations_retrieve()]
     assert locs == ['testing','pseudo tape']
     loc = 'testing'
     # not sure how many files we have in the test db
-    files = test_db.retrieve_files_in_location(loc)
+    files = test_db.files_retrieve_in_location(loc)
     # we set all our dummy files up with 10
-    l = test_db.retrieve_location(loc)
+    l = test_db.location_retrieve(loc)
     assert l.volume == len(files)*10
 
 def test_new_location(test_db):
     """ Test adding a new location with two protocols"""
     protocols = ['posix','s3']
     newloc = 'New-Location'
-    test_db.create_location(newloc,protocols=protocols)
-    loc = test_db.retrieve_location(newloc)
+    test_db.location_create(newloc,protocols=protocols)
+    loc = test_db.location_retrieve(newloc)
     rp = loc.protocolset
     assert protocols == [p.name for p in rp]
 
@@ -251,21 +251,21 @@ def test_new_protocol(test_db):
     """ 
     Test adding a new protocol against a new location and an existing location 
     """
-    locations = test_db.retrieve_locations()
+    locations = test_db.locations_retrieve()
     eloc = locations[0].name
     newloc = 'New-Location'
     newp = 'magic'
-    test_db.add_protocol(newp, locations=[eloc,newloc])
+    test_db.protocol_add(newp, locations=[eloc,newloc])
     for loc in [newloc, eloc]:
-        dloc = test_db.retrieve_location(loc)
+        dloc = test_db.location_retrieve(loc)
         locp = [p.name for p in dloc.protocolset]
         assert newp in locp
 
 
 def NOtest_handle_upload_duplicates():
 
-    acol1 = test_db.create_collection('acol1','for file testing')
-    acol2 = test_db.create_collection('acol2','for file testing')
+    acol1 = test_db.collection_create('acol1','for file testing')
+    acol2 = test_db.collection_create('acol2','for file testing')
     files = [{'path': '/yeah/what', 'name': f'uptestfile{j}', 'size': 10} for j in range(3)]
     test_db.upload_files_to_collection('testing','acol1',files[0:2])
     # this should only add one new fiedl, but it currently adds two
