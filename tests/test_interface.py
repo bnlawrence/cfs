@@ -3,6 +3,11 @@ from pathlib import Path
 
 import pytest
 
+###
+### This test file concentrates on the basics of files, collections, tags, relationships and 
+### locations.
+###
+
 def _dummy(db, location='testing', collection_stem="fdummy", files_per_collection=10):
     """ 
     Set up a dummy dataset in db with accessible structure for testing
@@ -15,12 +20,11 @@ def _dummy(db, location='testing', collection_stem="fdummy", files_per_collectio
         db.upload_files_to_collection(location, c, files)
 
 @pytest.fixture(scope="session", autouse=True)
-def test_db(tmp_path_factory):
+def setup_test_db(tmp_path_factory):
     """ 
     Get ourselves a db to work with. Note that this database is progressively
     modified by all the tests that follow. So if you're debugging tests, you 
-    have to work though them consecutively. Note that the order is not 
-    necessarily as deterministic
+    have to work though them consecutively. 
     """
     tmp_path = tmp_path_factory.mktemp('testing_interface')
     dbfile = str(Path(tmp_path)/'test.db')

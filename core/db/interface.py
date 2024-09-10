@@ -4,8 +4,8 @@ from django import template
 from django.db.models import Q, Count,OuterRef, Subquery
 
 from core.db.cfparse_file import cfparse_file, cfparse_file_to_collection
-from core.db.models import (Cell_Method, Collection, File, Location,
-                        Protocol, Relationship, Tag, Variable, Directory)
+from core.db.models import (Cell_Method, Collection, Domain, File, Location,
+                        Protocol, Relationship, Tag, Variable, Directory, Value, VALUE_KEYS)
 
 from tqdm import tqdm
 
@@ -15,7 +15,6 @@ register = template.Library()
 def get_obj_field(obj, key):
     return obj[key]
 #FIXME: When and how is the filter used, it's come from the old db.py, but it's a GOB thing.
-
 
 class CollectionDB:
 
@@ -227,6 +226,25 @@ class CollectionDB:
         else:
             return Collection.objects.all()
 
+    def domain_delete(self, domain_name):
+        d = Domain.objects.get(name=domain_name)
+        d.delete()
+    
+    def domain_get_or_create(self, properties):
+        """ Attempt to retrieve a domain based on properties, and if it doesn't
+        exist, create it and return it."""
+        d, created = Domain.objects.get_or_create(**properties)
+        if created:
+            d.save()
+        return d
+    
+    def domain_retrieve(self, properties):
+        d = Domain.objects.filter(**properties).all()
+        if len(d) > 1:
+            raise ValueError('Multiple domains match your query')
+        return d[0]
+    
+    
     def directories_retrieve(self):
         """
         Retrieve directories locations.
@@ -760,26 +778,44 @@ class CollectionDB:
         collection = self.collection_retrieve(collection)
         variables = Variable.objects.filter(in_collection__in=collection)
         return variables
+    
+    def variable_retrieve_or_make(self, varprops, extras={}):
+        """
+        If there is a variable corresponding to varprops, and it has
+        the same extra properties, return it, otherwise
+        create it. Varprops should be a dictionary which
+        inclues at least an identiy and an atomic origin.
+        """
+       
+   
+        def construct_properties(varprops):
 
-    def variable_retrieve_or_make(self, standard_name, long_name, identity, cfdm_size, cfdm_domain,realm,location):
-        """Retrieve variable by arbitrary property"""
-        var = Variable.objects.filter(
-            standard_name=standard_name,
-            long_name=long_name,
-            cfdm_size=cfdm_size,
-            cfdm_domain=cfdm_domain,
-        ).first()
-        if not var:
-            var = Variable(
-                standard_name=standard_name,
-                long_name=long_name,
-                identity=identity,
-                cfdm_size=cfdm_size,
-                cfdm_domain=cfdm_domain,
-                realm=realm,
-                location=location
-            )
+            definition = {}
+            for key in varprops:
+                if key in VALUE_KEYS:
+                    value, created = Value.objects.get_or_create(key=key, value=varprops[key])
+                    definition[key]=value
+                elif key == 'domain':
+                    definition[key]=self.domain_get_or_create(varprops[key])
+                elif key == 'cell_methods':
+                    definition[key]=self.cell_method_get_or_make(varprops[key])
+                else:
+                    raise RuntimeError(f'Unexpected key in variable construction [{key}]')
+            if '_proxied' not in varprops:
+                definition['_proxied']={}
+            return definition
+        
+        props = construct_properties(varprops)
+        candidates = Variable.objects.filter(**props).all()
+        for c in candidates:
+            if c._proxied == extras:
+                return c
+        var = Variable(**props)
+        for k,v in extras.items():
+            var[k]=v
+        var.save()
         return var
+
 
     def variable_search(self, key, value):
         results = self.variables_retrieve_all(key, value)
@@ -807,27 +843,23 @@ class CollectionDB:
         for var in vars:
             var.delete()
 
-    def variables_retrieve_all(self, key, value):
-        """Retrieve all variables that matches arbitrary property"""
-        if key == "identity":
-            results = Variable.objects.filter(identity=value)
-        if key == "id":
-            results = Variable.objects.filter(id=value)
-        if key == "long_name":
-            results = Variable.objects.filter(long_name=value)
-        if key == "standard_name":
-            results = Variable.objects.filter(standard_name=value)
-        if key == "cfdm_size":
-            results = Variable.objects.filter(cfdm_size=value)
-        if key == "cfdm_domain":
-            results = Variable.objects.filter(cfdm_domain=value)
-        if key == "cell_methods":
-            results = Variable.objects.filter(cell_methods__in=value)
-        if key == "in_files":
-            results = Variable.objects.filter(in_files__in=value)
+    def variables_retrieve_by_key(self, key, value):
+        """
+        Retrieve all variables that matches arbitrary property
+        describe by a key value pair, unless key = all, in which 
+        case return all variables.
+        """
         if key == "all":
-            return Variable.objects.all()
-
+            results = Variable.objects.all()
+        else:
+            if key in VALUE_KEYS:
+                value = Value.objects.get(key=key,value=value)
+            elif key == 'domain':
+                value = Domain.objects.get(name=value)
+            elif key == 'cell_method':
+                value = Cell_Method(**value)
+            args = {key:value}
+            results = Variable.objects.filter(**args)
         if not results.exists():
             return results
         return results
@@ -835,5 +867,3 @@ class CollectionDB:
     def variables_search(self, key, value):
         """Retrieve variable by arbitrary property"""
         return self.variables_retrieve_all(self, key, value)
-
-

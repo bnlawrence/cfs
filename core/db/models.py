@@ -1,5 +1,6 @@
 from django.db import models
 from django.db.models import Q, Count,OuterRef, Subquery
+from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_delete, m2m_changed
 
 from django.dispatch import receiver
@@ -11,6 +12,36 @@ def sizeof_fmt(num, suffix="B"):
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, "Yi", suffix)
+
+class Value(models.Model):
+    """ 
+    We hold all the terms used as values of properties, so 
+    as to minimise database stuff and speed up 
+    querying
+    """
+    id = models.AutoField(primary_key=True)
+    value = models.CharField(max_length=1024, null=True)
+    key = models.CharField(max_length=24)
+
+VALUE_KEYS = ['standard_name','long_name', 'identity', 'atomic_origin','temporal_resolution']
+
+class Domain(models.Model):
+    """ 
+    Store a representation of a model domain for comparison between variables.
+    : name : shorthand name for domain (e.g. N216)
+    : region : global or name of domain (e.g. Europe)
+    : nominal_resolution : xy resolution as used in CMIP, eg. 50km
+    : size : number of xy points
+    : coordinates: comma separarated coordinate names
+    """
+    class Meta:
+        app_label="db"
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=64)
+    region = models.CharField(max_length=20)
+    nominal_resolution = models.CharField(max_length=12)
+    size = models.IntegerField()
+    coordinates = models.CharField(max_length=256)
 
 
 class VDM(models.Model):
@@ -112,6 +143,9 @@ class File(models.Model):
         for l in self.locations.all():
             l.volume -= self.size
             l.save()
+        #FIXME: chatgpt wants me to call super().delete(*args,**kwargs) here 
+        #to avoid an infinite loop, but I don't think that will get called
+        #if I delete an entire query set in one go without the on_file_delete. Investigate.
 
 @receiver(pre_delete, sender=File)
 def on_file_delete(sender, instance, **kwargs):
@@ -187,6 +221,7 @@ class Collection(models.Model):
         """
         # this doesn't work because django has been too clever
         # files = files.annotate(collection_count=Count('collection'))
+        # ignore what ChatGPT thinks!
         collection_count_subquery = Collection.objects.filter(
                 files=OuterRef('pk')).values('files').annotate(count=Count('id')).values('count')
     
@@ -285,6 +320,13 @@ class Relationship(models.Model):
     subject = models.ForeignKey(Collection, related_name="subject",on_delete=models.CASCADE)
     related_to = models.ForeignKey(Collection, related_name="related",on_delete=models.CASCADE)
 
+class Cell_Method(models.Model):
+    class Meta:
+        app_label = "db"
+
+    id = models.AutoField(primary_key=True)
+    method = models.CharField(max_length=1024)
+    axis = models.CharField(max_length=256)
 
 class Variable(models.Model):
     class Meta:
@@ -314,16 +356,18 @@ class Variable(models.Model):
     def exists(self):
         return True
 
-    _cell_methods = models.JSONField()
-    _proxied = models.JSONField()
-    cfdm_size = models.BigIntegerField()
-    long_name = models.CharField(max_length=1024, null=True)
     id = models.AutoField(primary_key=True)
-    cfdm_domain = models.CharField(max_length=1024)
-    standard_name = models.CharField(max_length=1024, null=True)
+    _proxied = models.JSONField()
+    long_name = models.ForeignKey(Value, related_name='long_name', null=True, on_delete=models.CASCADE)
+    standard_name = models.ForeignKey(Value, related_name='standard_name', null=True, on_delete=models.CASCADE)
+    identity = models.ForeignKey(Value, related_name='identity', on_delete=models.CASCADE)
+    atomic_origin = models.ForeignKey(Value, related_name='atomic_origin', on_delete=models.CASCADE)
+    temporal_resolution =  models.ForeignKey(Value, related_name='temporal_resolution', on_delete=models.CASCADE)
+    domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
+    cell_methods = models.ManyToManyField(Cell_Method)
     in_collection = models.ManyToManyField(Collection)
     in_files = models.ManyToManyField(File)
-    identity = models.CharField(max_length=1024)
+
 
 
 class Var_Metadata(models.Model):
@@ -340,13 +384,7 @@ class Var_Metadata(models.Model):
     key = models.CharField(max_length=128)
 
 
-class Cell_Method(models.Model):
-    class Meta:
-        app_label = "db"
 
-    id = models.AutoField(primary_key=True)
-    method = models.CharField(max_length=1024)
-    axis = models.CharField(max_length=256)
 
 class Directory(models.Model):
     class Meta:
