@@ -4,7 +4,7 @@ from django import template
 from django.db.models import Q, Count,OuterRef, Subquery
 
 from core.db.cfparse_file import cfparse_file, cfparse_file_to_collection
-from core.db.models import (Cell_Method, Collection, Domain, File, Location,
+from core.db.models import (Cell_MethodSet, Cell_Method, Collection, Domain, File, Location,
                         Protocol, Relationship, Tag, Variable, Directory, Value, VALUE_KEYS)
 
 from tqdm import tqdm
@@ -16,6 +16,9 @@ def get_obj_field(obj, key):
     return obj[key]
 #FIXME: When and how is the filter used, it's come from the old db.py, but it's a GOB thing.
 
+
+
+
 class CollectionDB:
 
     @property
@@ -24,6 +27,34 @@ class CollectionDB:
         List the names of all the tables in the database interface
         """
         return self.engine.table_names()
+    
+    def _construct_properties(self,varprops, ignore_proxy=False):
+        """ 
+        Used to parse a set of variable properties in words into appropriate
+        model instances for inserting and querying the database
+        """
+
+        definition, extras = {},{}
+        for key in varprops:
+            if key in VALUE_KEYS:
+                value, created = Value.objects.get_or_create(key=key, value=varprops[key])
+                definition[key]=value
+            elif key == 'domain':
+                definition[key]=self.domain_get_or_create(varprops[key])
+            elif key == 'cell_methods':
+                method_set = self.cell_methods_get_or_create(varprops[key])
+                definition[key]=method_set
+            else:
+                extras[key]=varprops[key]
+        if not ignore_proxy:
+            definition['_proxied']=extras
+        return definition
+
+    def cell_methods_get_or_create(self, methods):
+        """ Handles getting and creating cell methods """
+        methods = [self.cell_method_get_or_create(*m) for m in methods]
+        method_set = Cell_MethodSet.get_or_create_from_methods(methods)
+        return method_set
 
 
     def cell_method_add(self, axis, method):
@@ -39,15 +70,15 @@ class CollectionDB:
         else:
             raise ValueError(f"Attempt to add an existing cell method {cm}")
 
-    def cell_method_get_or_make(self, axis, method):
+    def cell_method_get_or_create(self, axis, method):
         """
         Retrieve a specfic cell method, if it doesn't exist, create it, and return it.
         """
-        try:
-            self.cell_method_retrieve(axis=axis, method=method)
-        except Cell_Method.DoesNotExist:
-            return self.cell_method_add(axis=axis, method=method)
-
+        cm, created = Cell_Method.objects.get_or_create(axis=axis, method=method)
+        if created:
+            cm.save()
+        return cm
+       
     def cell_method_retrieve(self, axis, method):
         """
         Retrieve a specific cell method
@@ -239,10 +270,19 @@ class CollectionDB:
         return d
     
     def domain_retrieve(self, properties):
+        """ 
+        Retreive domain by properties
+        """
         d = Domain.objects.filter(**properties).all()
         if len(d) > 1:
             raise ValueError('Multiple domains match your query')
         return d[0]
+    
+    def domains_all(self):
+        """ 
+        Get all the domains
+        """
+        return Domain.objects.all()
     
     
     def directories_retrieve(self):
@@ -343,17 +383,16 @@ class CollectionDB:
                 raise ValueError(f'{properties} describes multiple files')
         return fset[0]
 
-    def file_retrieve_or_make(self, match):
+    def file_retrieve_or_make(self, properties):
         """
-        Retrieve a file of the chosen name. If one doesn't exist, it makes one.
+        Retrieve a file with the given properties. If one doesn't exist, it makes one.
         """
-        #FIXME: Duplicate functoinality?
-        file = File.objects.filter(name__contains=match).all()
-        if not file.exists():
-            file = File.objects.create(name=match, size=0)
+        try:
+            return self.file_retrieve_by_properties(**properties)
+        except FileNotFoundError:
+            file = File(**properties)
             file.save()
-            file = File.objects.filter(name__contains=match).all()
-        return file
+            return file
 
     def files_retrieve_from_variables(self, variables):
         files = File.objects.filter(variable__in=variables)
@@ -721,19 +760,25 @@ class CollectionDB:
         c.save()
         loc.save()
 
+
+    def variable_add_to_file_and_collection(self, variable, file, collection_name):
+        """
+        Add a variable instance to a file instance and add it into a collection
+        (identified by name)
+        """
+        self.variable_add_to_collection(collection_name, variable)
+        variable.in_files.add(file)
+        variable.save()
+    
+
     def variable_add_to_collection(self, collection, variable):
         """
         Add variable to a collection
         """
         c = Collection.objects.get(name=collection)
-        if variable in c.variable_set.all():
-            print(
-                f"Attempt to add variable {variable.long_name}/{variable.standard_name} to {c.name} - but it's already there"
-            )
-        else:
-            variable.in_collection.add(c)
-            variable.save()
-            c.save()
+        # django handles duplicates gracefully
+        c.variables.add(variable)
+        c.save()
 
     def variable_delete(self, var_name):
         """
@@ -779,42 +824,19 @@ class CollectionDB:
         variables = Variable.objects.filter(in_collection__in=collection)
         return variables
     
-    def variable_retrieve_or_make(self, varprops, extras={}):
+    def variable_retrieve_or_make(self, varprops):
         """
-        If there is a variable corresponding to varprops, and it has
-        the same extra properties, return it, otherwise
-        create it. Varprops should be a dictionary which
-        inclues at least an identiy and an atomic origin.
+        If there is a variable corresponding to varprops with the same full set of properties, 
+        return it, otherwise create it. Varprops should be a dictionary which inclues at least 
+        an identiy and an atomic origin.
         """
-       
-   
-        def construct_properties(varprops):
 
-            definition = {}
-            for key in varprops:
-                if key in VALUE_KEYS:
-                    value, created = Value.objects.get_or_create(key=key, value=varprops[key])
-                    definition[key]=value
-                elif key == 'domain':
-                    definition[key]=self.domain_get_or_create(varprops[key])
-                elif key == 'cell_methods':
-                    definition[key]=self.cell_method_get_or_make(varprops[key])
-                else:
-                    raise RuntimeError(f'Unexpected key in variable construction [{key}]')
-            if '_proxied' not in varprops:
-                definition['_proxied']={}
-            return definition
-        
-        props = construct_properties(varprops)
-        candidates = Variable.objects.filter(**props).all()
-        for c in candidates:
-            if c._proxied == extras:
-                return c
-        var = Variable(**props)
-        for k,v in extras.items():
-            var[k]=v
-        var.save()
+        props = self._construct_properties(varprops)
+        var, created = Variable.objects.get_or_create(**props)
+        if created:
+            var.save()
         return var
+    
 
 
     def variable_search(self, key, value):
@@ -822,6 +844,9 @@ class CollectionDB:
         if not results.exists():
             return results
         return results[0]
+    
+    def variables_all(self):
+        return Variable.objects.all()
 
     def variables_add_from_file(self, filename, cffilelocation):
         """Add all the variables found in a file to the database"""
@@ -849,21 +874,55 @@ class CollectionDB:
         describe by a key value pair, unless key = all, in which 
         case return all variables.
         """
-        if key == "all":
-            results = Variable.objects.all()
+        proxied = False
+        if key in VALUE_KEYS:
+            value = Value.objects.get(key=key,value=value)
+        elif key == 'domain':
+            value = Domain.objects.get(name=value)
+        elif key == 'cell_method':
+            value = Cell_Method(**value)
+        elif key in ['in_collections' or 'in_files']:
+            raise NotImplementedError
         else:
-            if key in VALUE_KEYS:
-                value = Value.objects.get(key=key,value=value)
-            elif key == 'domain':
-                value = Domain.objects.get(name=value)
-            elif key == 'cell_method':
-                value = Cell_Method(**value)
-            args = {key:value}
-            results = Variable.objects.filter(**args)
+            print('This will be horrendously slow. Try to avoid')
+            results = []
+            for v in Variable.objects.all():
+                if key in v:
+                    if v[key] == value:
+                        results.append(v)
+            return results
+             
+        args = {key:value}
+        results = Variable.objects.filter(**args)
         if not results.exists():
             return results
         return results
 
-    def variables_search(self, key, value):
-        """Retrieve variable by arbitrary property"""
-        return self.variables_retrieve_all(self, key, value)
+    def variables_retrieve_by_properties(self, properties, from_collection=None):
+        """
+        Retrieve variable by arbitrary set of properties 
+        """
+        filters = []
+        for key in ['cell_methods','in_file']:
+            if key in properties:
+                filters.append((key,properties.pop(key)))
+        usable = self._construct_properties(properties)
+        if from_collection is None:
+            variables = Variable.objects.filter(**usable)
+        else:
+            if not isinstance(from_collection,Collection):
+                from_collection = Collection.objects.get(name=from_collection)
+            variables = from_collection.variables.filter(**usable)
+        for key,value in filters:
+            if key == 'cell_methods':
+                for x in value:
+                    cm = self.cell_method_retrieve(*x) 
+                    variables=variables.filter(cell_methods__methods=cm)
+            elif key == 'in_file':
+                if not isinstance(value,File):
+                    value = self.file_retrieve_by_properties(**value)
+                variables=variables.filter(in_files=value)
+            else:
+                raise NotImplementedError('Unknown variable retrieval option: {key},{value}')
+        return variables.all()
+        

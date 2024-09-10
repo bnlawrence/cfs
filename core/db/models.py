@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models import Q, Count,OuterRef, Subquery
 from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_delete, m2m_changed
+import hashlib
 
 from django.dispatch import receiver
 
@@ -27,11 +28,11 @@ VALUE_KEYS = ['standard_name','long_name', 'identity', 'atomic_origin','temporal
 
 class Domain(models.Model):
     """ 
-    Store a representation of a model domain for comparison between variables.
+    Store a representation of a model spatial domain for comparison between variables.
     : name : shorthand name for domain (e.g. N216)
     : region : global or name of domain (e.g. Europe)
     : nominal_resolution : xy resolution as used in CMIP, eg. 50km
-    : size : number of xy points
+    : size : number of xyz points
     : coordinates: comma separarated coordinate names
     """
     class Meta:
@@ -209,6 +210,7 @@ class Collection(models.Model):
     files = models.ManyToManyField(File)
     properties = models.ManyToManyField(CollectionProperty)
     tags = models.ManyToManyField(Tag)
+    variables = models.ManyToManyField("Variable")
 
     @property
     def n_files(self):
@@ -323,10 +325,40 @@ class Relationship(models.Model):
 class Cell_Method(models.Model):
     class Meta:
         app_label = "db"
+    method = models.CharField(max_length=256)
+    axis = models.CharField(max_length=64)
+    def __str__(self):
+        return f"{self.axis} : {self.method}"
 
-    id = models.AutoField(primary_key=True)
-    method = models.CharField(max_length=1024)
-    axis = models.CharField(max_length=256)
+class Cell_MethodSet(models.Model):
+    """ 
+    A hash table to make cell method searches efficient when needed
+    for variable identity matching. THe other option of directly
+    linking cell method make creating new variables very inefficient.
+    """
+    class Meta:
+        app_label = "db"
+    methods = models.ManyToManyField(Cell_Method)
+    key = models.CharField(max_length=64, unique=True)
+    def __str__(self):
+        return ','.join([str(m) for m in self.methods.all()])
+
+    @staticmethod
+    def generate_key(methods):
+        """Generate a unique key (e.g., hash) for a list of method ids."""
+        method_ids = sorted([str(method.id) for method in methods])  # Sort to avoid ordering issues
+        key_string = ",".join(method_ids)  # Create a string with sorted method ids
+        return hashlib.md5(key_string.encode('utf-8')).hexdigest()  # Create an MD5 hash
+
+    @classmethod
+    def get_or_create_from_methods(cls, methods):
+        """Retrieve or create a Cell_MethodSet based on the list of methods."""
+        key = cls.generate_key(methods)
+        method_set, created = cls.objects.get_or_create(key=key)
+        if created:
+            method_set.methods.set(methods)  # Set methods if it's a new Cell_MethodSet
+        return method_set
+
 
 class Variable(models.Model):
     class Meta:
@@ -355,6 +387,9 @@ class Variable(models.Model):
 
     def exists(self):
         return True
+    
+    def __str__(self):
+        return self.identity.value
 
     id = models.AutoField(primary_key=True)
     _proxied = models.JSONField()
@@ -364,8 +399,7 @@ class Variable(models.Model):
     atomic_origin = models.ForeignKey(Value, related_name='atomic_origin', on_delete=models.CASCADE)
     temporal_resolution =  models.ForeignKey(Value, related_name='temporal_resolution', on_delete=models.CASCADE)
     domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
-    cell_methods = models.ManyToManyField(Cell_Method)
-    in_collection = models.ManyToManyField(Collection)
+    cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.CASCADE) 
     in_files = models.ManyToManyField(File)
 
 
