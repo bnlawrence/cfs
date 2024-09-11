@@ -3,10 +3,12 @@ from pathlib import Path
 import pytest
 
 
-def test_blank_database(tmp_path):
+def test_blank_database(tmp_path, request):
     """ Test that the system can install a blank database with our basic model"""
 
-    dbfile = str(Path(tmp_path)/'test.db')
+
+    module_name = request.module.__name__  # Get the module (test file) name
+    dbfile = str(Path(tmp_path) / f'{module_name}.db')
     migrations_location = str(Path(tmp_path)/'migrations')
 
     print('db',dbfile, migrations_location)

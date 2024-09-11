@@ -3,14 +3,15 @@ from core.db.standalone import setup_django
 from django.db.models import Count,OuterRef, Subquery
 import pytest
 
-def test_unique_files_and_empty(tmp_path):
+def test_unique_files_and_empty(tmp_path, request):
     """ 
     Test the pieces that we use to build up a unique file count
     and then test that it all works for emptying and deleting
     a collection
     """
 
-    dbfile = str(Path(tmp_path)/'test.db')
+    module_name = request.module.__name__  # Get the module (test file) name
+    dbfile = str(Path(tmp_path) / f'{module_name}.db')
     migrations_location = str(Path(tmp_path)/'migrations')
 
     setup_django(db_file=dbfile,

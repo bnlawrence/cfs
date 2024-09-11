@@ -3,7 +3,6 @@ import os
 from django import template
 from django.db.models import Q, Count,OuterRef, Subquery
 
-from core.db.cfparse_file import cfparse_file, cfparse_file_to_collection
 from core.db.models import (Cell_MethodSet, Cell_Method, Collection, Domain, File, Location,
                         Protocol, Relationship, Tag, Variable, Directory, Value, VALUE_KEYS)
 
@@ -15,9 +14,6 @@ register = template.Library()
 def get_obj_field(obj, key):
     return obj[key]
 #FIXME: When and how is the filter used, it's come from the old db.py, but it's a GOB thing.
-
-
-
 
 class CollectionDB:
 
@@ -37,7 +33,7 @@ class CollectionDB:
         definition, extras = {},{}
         for key in varprops:
             if key in VALUE_KEYS:
-                value, created = Value.objects.get_or_create(key=key, value=varprops[key])
+                value, created = Value.objects.get_or_create(value=varprops[key])
                 definition[key]=value
             elif key == 'domain':
                 definition[key]=self.domain_get_or_create(varprops[key])
@@ -832,6 +828,12 @@ class CollectionDB:
         """
 
         props = self._construct_properties(varprops)
+        required = ['atomic_origin','identity']
+        invalid_make = False
+        for x in required:
+            if x not in props:
+                raise ValueError(f'Cannot do variable make or retrieve without {required} properties')
+        
         var, created = Variable.objects.get_or_create(**props)
         if created:
             var.save()
@@ -847,18 +849,6 @@ class CollectionDB:
     
     def variables_all(self):
         return Variable.objects.all()
-
-    def variables_add_from_file(self, filename, cffilelocation):
-        """Add all the variables found in a file to the database"""
-        #def add_variables_from_file(self, filename, cffilelocation):
-        cfparse_file(self, filename, cffilelocation)
-
-
-    def variables_add_from_file_to_collection(self, filename, collection, cffilelocation):
-            #def add_variables_from_file_to_collection(self, filename, collection, cffilelocation):
-        """Add all the variables found in a file to the database"""
-        cfparse_file_to_collection(self, filename, collection, cffilelocation)
-
 
     def variables_delete_all(self):
         """
@@ -876,7 +866,8 @@ class CollectionDB:
         """
         proxied = False
         if key in VALUE_KEYS:
-            value = Value.objects.get(key=key,value=value)
+            #value = Value.objects.get(key=key,value=value)
+            pass
         elif key == 'domain':
             value = Domain.objects.get(name=value)
         elif key == 'cell_method':
@@ -898,7 +889,7 @@ class CollectionDB:
             return results
         return results
 
-    def variables_retrieve_by_properties(self, properties, from_collection=None):
+    def variables_retrieve_by_properties(self, properties, from_collection=None, unique=False):
         """
         Retrieve variable by arbitrary set of properties 
         """
@@ -906,9 +897,11 @@ class CollectionDB:
         for key in ['cell_methods','in_file']:
             if key in properties:
                 filters.append((key,properties.pop(key)))
-        usable = self._construct_properties(properties)
+        usable = self._construct_properties(properties, ignore_proxy=True)
+        
         if from_collection is None:
             variables = Variable.objects.filter(**usable)
+
         else:
             if not isinstance(from_collection,Collection):
                 from_collection = Collection.objects.get(name=from_collection)
@@ -924,5 +917,10 @@ class CollectionDB:
                 variables=variables.filter(in_files=value)
             else:
                 raise NotImplementedError('Unknown variable retrieval option: {key},{value}')
+        if unique:
+            c = variables.count()
+            if c != 1:
+                raise ValueError('Query retrieved multiple variables ({c}) - but uniqueness was requested')
+            return variables.first()
         return variables.all()
         

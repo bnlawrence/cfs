@@ -19,17 +19,20 @@ def _dummy(db, location='testing', collection_stem="fdummy", files_per_collectio
         files = [{'path': '/somewhere/in/unix_land', 'name': f'file{j}{i}', 'size': 10} for j in range(files_per_collection)]
         db.upload_files_to_collection(location, c, files)
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_db(tmp_path_factory):
+@pytest.fixture(scope="module", autouse=True)
+def setup_test_db(tmp_path_factory, request):
     """ 
     Get ourselves a db to work with. Note that this database is progressively
     modified by all the tests that follow. So if you're debugging tests, you 
     have to work though them consecutively. 
     """
-    tmp_path = tmp_path_factory.mktemp('testing_interface')
-    dbfile = str(Path(tmp_path)/'test.db')
+    module_name = request.module.__name__  # Get the module (test file) name
+    tmp_path = tmp_path_factory.mktemp(module_name)  # Create a unique temp directory for the module
+    dbfile = str(Path(tmp_path) / f'{module_name}.db')
     migrations_location = str(Path(tmp_path)/'migrations')
     setup_django(db_file=dbfile,  migrations_location=migrations_location)
+
+    
 
 @pytest.fixture
 def test_db():

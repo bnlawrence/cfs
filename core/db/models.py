@@ -22,7 +22,11 @@ class Value(models.Model):
     """
     id = models.AutoField(primary_key=True)
     value = models.CharField(max_length=1024, null=True)
-    key = models.CharField(max_length=24)
+    def __str__(self):
+        if self.value is not None:
+            return self.value
+        else:
+            return "None"
 
 VALUE_KEYS = ['standard_name','long_name', 'identity', 'atomic_origin','temporal_resolution']
 
@@ -33,7 +37,7 @@ class Domain(models.Model):
     : region : global or name of domain (e.g. Europe)
     : nominal_resolution : xy resolution as used in CMIP, eg. 50km
     : size : number of xyz points
-    : coordinates: comma separarated coordinate names
+    : coordinates: comma separarated spatial coordinate names
     """
     class Meta:
         app_label="db"
@@ -43,6 +47,9 @@ class Domain(models.Model):
     nominal_resolution = models.CharField(max_length=12)
     size = models.IntegerField()
     coordinates = models.CharField(max_length=256)
+
+    def __str__(self):
+        return f'{self.name}({self.nominal_resolution})'
 
 
 class VDM(models.Model):
@@ -397,8 +404,8 @@ class Variable(models.Model):
     standard_name = models.ForeignKey(Value, related_name='standard_name', null=True, on_delete=models.CASCADE)
     identity = models.ForeignKey(Value, related_name='identity', on_delete=models.CASCADE)
     atomic_origin = models.ForeignKey(Value, related_name='atomic_origin', on_delete=models.CASCADE)
-    temporal_resolution =  models.ForeignKey(Value, related_name='temporal_resolution', on_delete=models.CASCADE)
-    domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
+    temporal_resolution =  models.ForeignKey(Value, related_name='temporal_resolution', null=True,on_delete=models.CASCADE)
+    domain = models.ForeignKey(Domain, null=True,on_delete=models.CASCADE)
     cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.CASCADE) 
     in_files = models.ManyToManyField(File)
 
