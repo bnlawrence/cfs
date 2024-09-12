@@ -301,6 +301,7 @@ class CollectionDB:
         cfa = Directory.objects.filter(cfa=True)
         return cfa
 
+
     def file_add_to_collection(self,
                                collection_name,
                                file_instance,
@@ -378,17 +379,6 @@ class CollectionDB:
             if unique:
                 raise ValueError(f'{properties} describes multiple files')
         return fset[0]
-
-    def file_retrieve_or_make(self, properties):
-        """
-        Retrieve a file with the given properties. If one doesn't exist, it makes one.
-        """
-        try:
-            return self.file_retrieve_by_properties(**properties)
-        except FileNotFoundError:
-            file = File(**properties)
-            file.save()
-            return file
 
     def files_retrieve_from_variables(self, variables):
         files = File.objects.filter(variable__in=variables)
@@ -666,8 +656,8 @@ class CollectionDB:
         and calls upload_files_to_collection. See that function for explanation of
         arguments.
         """
-        return self.upload_files_to_collection(
-            self, location, collection, [f], lazy, update=True, progress=False )[0]
+        return self.upload_files_to_collection(location, collection, 
+                                               [f], lazy, update=True, progress=False )[0]
 
 
     def upload_files_to_collection(self, location_name, collection_name, list_of_files,
@@ -755,6 +745,7 @@ class CollectionDB:
 
         c.save()
         loc.save()
+        return results
 
 
     def variable_add_to_file_and_collection(self, variable, file, collection_name):

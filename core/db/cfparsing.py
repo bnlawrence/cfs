@@ -1,6 +1,23 @@
 
 import cf
 
+def manage_types(value):
+    """
+    For full generality of eventual usage, turn any items into standard Python types.
+    """
+    if isinstance(value, str):
+        return value
+    elif isinstance(value, bool):
+        return value
+    elif isinstance(value, np.int32):
+        return int(value)
+    elif isinstance(value, int):
+        return value
+    elif isinstance(value, np.floating):
+        return float(value)
+    else:
+        raise ValueError("Unrecognised type property type", type(value))
+
 class Lookup:
     """ 
     Copy and extend for different grids. You can then pass your lookup table to the 
@@ -134,6 +151,6 @@ def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None):
                 method = cm.get_method()
                 cmlist.append((a,method))
         description['cell_methods'] = cmlist
-        description['_proxied'] = properties
+        description['_proxied'] = {k:manage_types(v) for k,v in properties.items()}
         descriptions.append(description)
     return descriptions
