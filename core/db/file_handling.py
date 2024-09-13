@@ -52,5 +52,3 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles):
     t2 = time()-t1
     return f'cfupload_ncfiles uploaded {nf} files ({nv} variables) which took {t2:.2}({t:.2})s'
 
-
-   

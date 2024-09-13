@@ -21,17 +21,7 @@ def setup_test_db(tmp_path_factory, request):
     yield # This marks the end of the setup phase and begins the test execution
 
 
-@pytest.fixture
-def django_dependencies():
-    """ 
-    The database (and it's contents) is used in all the following
-    tests, and is progressively modified as the tests proceed.
-    Posix imports some django dependent stuff as well. 
-    """
-    from core.db.interface import CollectionDB
-    from core.plugins.posix import Posix, get_parent_paths
-    db = CollectionDB()
-    return db, Posix(db,'vftesting'), get_parent_paths
+
 
 @pytest.fixture
 def posix_info(tmp_path, inputfield):
