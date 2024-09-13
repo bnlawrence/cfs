@@ -68,3 +68,21 @@ def test_cfa_view(django_dependencies, cfa_resources):
         )
     c1 = test_db.collection_retrieve('posix_cfa_example')
     assert set([x.standard_name.value for x in c1.variables.all()]) == set(VARIABLE_LIST)
+
+
+def test_cfa_cleanup(django_dependencies):
+    """ 
+    A good test to see if we can empty out the 
+    bulk of the database cleanly.
+    """
+    test_db, ignore , ignore = django_dependencies
+    collections = test_db.collections_retrieve(name_contains='posix')
+    assert collections.count() == 1, "Failed to find correct number of posix collections"
+    # find all the files in those collections and make sure we delete those
+    for collection in collections:
+        test_db.collection_delete(collection.name, force=True)
+    for v in test_db.variables_all():
+        assert v.in_files.count()!=0, f"Variable [{v}] should not exist if it is in NO files"
+    test_db.location_delete('vftesting')
+    # Eventually we need to check we empty the fragment files too.
+

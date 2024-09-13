@@ -30,6 +30,7 @@ class Posix:
         subcollections=False,
         checksum=None,
         regex=None,
+        match='*.nc',
     ):
         """
         Add a new collection with all netcdf files below <path_to_collection_head>,
@@ -72,7 +73,7 @@ class Posix:
         # walk the directory view
         basedir = Path(path_to_collection_head)
         dbfiles = []
-        for p in basedir.rglob('*'):
+        for p in basedir.rglob(match):
             if p.is_file():
                 if subcollections:
                     parents = get_parent_paths(p,basedir,collection_head_name)

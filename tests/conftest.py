@@ -3,6 +3,18 @@ import pytest
 import numpy as np
 
 @pytest.fixture
+def django_dependencies():
+    """ 
+    The database (and it's contents) is used in all tests
+    tests, and is progressively modified as the tests proceed.
+    Posix imports some django dependent stuff as well. 
+    """
+    from core.db.interface import CollectionDB
+    from core.plugins.posix import Posix, get_parent_paths
+    db = CollectionDB()
+    return db, Posix(db,'vftesting'), get_parent_paths
+
+@pytest.fixture
 def inputfield():
     """ 
     Create a field to use for testing. This is nearly straight from the CF documentation.
@@ -43,12 +55,16 @@ def inputfield():
     Q.set_construct(cell_method2)
 
     # Create a "time" dimension coordinate construct with no bounds
-    tdata = [15.5,44.5,75.]
+    tdata = [15,45,75]
+    bdata = [[1,30],[31,60],[61,90]]
     dimT = cf.DimensionCoordinate(
-                                properties={'standard_name': 'time',
-                                            'units': 'days since 2018-12-01'},
-                                data=cf.Data(tdata)
-                                )
+                properties={'standard_name': 'time',
+                            'units': 
+                                cf.Units('days since 2018-12-30',calendar='360_day')},
+                data=cf.Data(tdata),
+                bounds = cf.Bounds(data=cf.Data(bdata))
+    )
+
     # Create a "longitude" dimension coordinate construct, without
     # coordinate bounds
     dimX = cf.DimensionCoordinate(data=cf.Data(np.arange(8.)))
@@ -75,3 +91,4 @@ def inputfield():
     Q.set_construct(dimX)
 
     return Q
+

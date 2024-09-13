@@ -35,9 +35,20 @@ def test_db():
 
 def test_infer_timing(inputfield):
 
+    #FIXME:Horrible hack. Hourly unit tests fail if we start with cf.Data(15.,45.,75.5)
+    #Why?Help?
+    tconstruct = inputfield.construct('T')
+    t2construct = cf.DimensionCoordinate(
+                        properties={'standard_name': 'time',
+                        'units': cf.Units('days since 2018-12-31')},
+                        data = cf.Data([15.5,45.5,75.5]) )
+    inputfield.set_construct(t2construct)
+    print('bounds',inputfield.construct('T').has_bounds())
+
     assert infer_temporal_resolution(inputfield) == '1m'
 
-    inputfield.construct('T')[...] = [0,1./24,2./24]
+    inputfield.construct('T')[...] = [0/24.,1./24,2./24]
+   
     assert infer_temporal_resolution(inputfield) == '1h'
 
     inputfield.construct('T')[...] = [0,3./24,6./24]
