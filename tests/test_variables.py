@@ -107,8 +107,10 @@ def test_file_variable_collection(test_db):
     """
     file_properties ={'name':'test_file_1','path':'/nowhere/','size':10}
     v = test_db.variables_retrieve_by_properties({'identity':'test var 6'})[0]
-    f = test_db.file_retrieve_or_make(file_properties)
     c = test_db.collection_create('Holding')
+    l = test_db.locations_retrieve()[0]
+    f = test_db.upload_file_to_collection(l.name, c.name, file_properties)
+  
     test_db.variable_add_to_file_and_collection(v, f, c.name)
     var2 = test_db.variables_retrieve_by_properties({'in_file':f})    
     assert var2[0] == v

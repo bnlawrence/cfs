@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Q, Count,OuterRef, Subquery
 from django.core.exceptions import ValidationError
-from django.db.models.signals import pre_delete, m2m_changed
+from django.db.models.signals import pre_delete, m2m_changed, post_delete
 import hashlib
 
 from django.dispatch import receiver
@@ -95,6 +95,8 @@ class Location(models.Model):
     @property
     def protocolset(self):
         return self.protocols.all()
+    def __str__(self):
+        return f'{self.name} ({sizeof_fmt(self.volume)})'
 
 
 class File(models.Model):
@@ -143,17 +145,24 @@ class File(models.Model):
         return s
     
     def delete(self,*args,**kwargs):
-        """ When a file is deleted, we need to make sure that the volume associated with
-        it is removed from any collections and locations """
+        """ 
+        When a file is deleted, we need to make sure that the volume associated with
+        it is removed from any collections and locations. We also need to delete any
+        variables where this is the last file which references it. 
+        """
         for c in self.collection_set.all():
             c.volume -= self.size
             c.save()
         for l in self.locations.all():
             l.volume -= self.size
             l.save()
-        #FIXME: chatgpt wants me to call super().delete(*args,**kwargs) here 
-        #to avoid an infinite loop, but I don't think that will get called
-        #if I delete an entire query set in one go without the on_file_delete. Investigate.
+        candidates = self.variable_set.all()
+        for var in candidates:
+            if var.in_files.count() == 1:
+                var.delete()
+        #chatgpt wants me to call super().delete(*args,**kwargs) here
+        # but that clashes with the on_file_delete hooks, so we don't do that
+        #to avoid an infinite loop!
 
 @receiver(pre_delete, sender=File)
 def on_file_delete(sender, instance, **kwargs):
@@ -167,7 +176,6 @@ class Tag(models.Model):
 
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=64)
-
 
 #    collection_id = models.ForeignKey(Collection.id)
 #    collections = models.ManyToManyField(Collection)
@@ -206,7 +214,7 @@ class Collection(models.Model):
         del self._proxied[key]
 
     def __str__(self):
-        return f"{self.name} ({self.n_files},{sizeof_fmt(self.volume)})"
+        return f"{self.name} (v{self.variables.count()},f{self.n_files},{sizeof_fmt(self.volume)})"
 
     _proxied = models.JSONField()
     name = models.CharField(max_length=256, unique=True)
@@ -322,12 +330,12 @@ class Relationship(models.Model):
     class Meta:
         app_label = "db"
 
-    def __repr__(self):
+    def __str__(self):
         return f'[{self.subject.name}] [{self.predicate}] [{self.related_to.name}]'
 
     predicate = models.CharField(max_length=50)
-    subject = models.ForeignKey(Collection, related_name="subject",on_delete=models.CASCADE)
-    related_to = models.ForeignKey(Collection, related_name="related",on_delete=models.CASCADE)
+    subject = models.ForeignKey(Collection, related_name="related_to",on_delete=models.CASCADE)
+    related_to = models.ForeignKey(Collection, related_name="subject",on_delete=models.CASCADE)
 
 class Cell_Method(models.Model):
     class Meta:
@@ -405,9 +413,23 @@ class Variable(models.Model):
     identity = models.ForeignKey(Value, related_name='identity', on_delete=models.CASCADE)
     atomic_origin = models.ForeignKey(Value, related_name='atomic_origin', on_delete=models.CASCADE)
     temporal_resolution =  models.ForeignKey(Value, related_name='temporal_resolution', null=True,on_delete=models.CASCADE)
-    domain = models.ForeignKey(Domain, null=True,on_delete=models.CASCADE)
-    cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.CASCADE) 
+    domain = models.ForeignKey(Domain, null=True,on_delete=models.SET_NULL)
+    cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.SET_NULL) 
     in_files = models.ManyToManyField(File)
+
+    def predelete(self):
+        """ 
+        When a variable is deleted, we need to make sure that any cell_methods, domains,
+        and terms which are unique to this variable are also deleted.
+        """
+        for x in ['domain','cell_methods']:
+            y = getattr(self,x)
+            if y.variable_set.count() == 1:
+                y.delete()
+    def delete(self,*args,**kwargs):
+        self.predelete()
+        super().delete(*args,**kwargs)
+
 
 
 

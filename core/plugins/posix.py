@@ -74,9 +74,8 @@ class Posix:
         dbfiles = []
         for p in basedir.rglob('*'):
             if p.is_file():
-                relative_path = p.relative_to(basedir)
                 if subcollections:
-                    parents = [basedir/d for d in relative_path.parents]
+                    parents = get_parent_paths(p,basedir,collection_head_name)
                 else:
                     parents = []
                 dbfiles.append(file2dict(p, parents, checksum=checksum))
@@ -86,13 +85,15 @@ class Posix:
             collections = f['collections']
             for sc in collections:
                 try:
-                    cc = self.db.collection_retrieve(sc)
+                    cc = self.db.collection_retrieve(str(sc))
                 except ValueError:
-                    cc = self.db.collection_create(name=sc, description="Subdirectory of collection {c}")
-                    pd = cc.parent
-                    self.db.relationships_add(pd,sc,'parent','subdir')
+                    cc = self.db.collection_create(str(sc), description="Subdirectory of collection {c}")
+                    pd = str(Path(sc).parent)
+                    #print(f'Created {cc} with parent {pd}')
+                    #ppd = self.db.collection_retrieve(pd)
+                    self.db.relationships_add(pd,cc.name,'parent_of','subdir_of')
 
-        msg = cfupload_ncfiles(self.db, self.location, collection_head_name, dbfiles)
+        msg = cfupload_ncfiles(self.db, self.location, c, dbfiles)
         print(msg)
      
 
@@ -109,3 +110,14 @@ def file2dict(p, parents, checksum=None):
     f = {"size": p.stat().st_size, "path": str(p), "name":str(p.name), 'collections':parents}
 
     return f
+
+def get_parent_paths(path, basedir, headname):
+    if basedir not in path.parents:
+        raise ValueError(f'Base directory {basedir} not part of path {path}')
+    parents = []
+    for parent in path.parents:
+        if parent == basedir:
+            break
+        relative_path = parent.relative_to(basedir)
+        parents.append(f'{headname}/{relative_path}')
+    return parents

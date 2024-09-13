@@ -18,17 +18,16 @@ def cfupload_variables(db, file, collection, extra_collections):
     t1 = time()
     fields = cf.read(file.path)
     descriptions = parse_fields_todict(fields)
-    cset = [db.collection_retrieve(c) for c in extra_collections]
     for d in descriptions:
         v = db.variable_retrieve_or_make(d)
         db.variable_add_to_file_and_collection(v, file, collection)
-        for c in cset:
+        for c in extra_collections:
              db.variable_add_to_collection(c, v)
     t2 = time()-t1
     return f'cfupload_file: {len(descriptions)} uploaded in {t2:.2f}s',len(descriptions),t2
 
 
-def cfupload_ncfiles(db, location_name, base_collection_name, dbfiles):
+def cfupload_ncfiles(db, location_name, base_collection, dbfiles):
     """ 
     Upload the cf information held in a bunch of files described by "normal file dictionaries"
     with a list of extra target collections embedded in each.
@@ -44,9 +43,8 @@ def cfupload_ncfiles(db, location_name, base_collection_name, dbfiles):
             collections = fd.pop('collections')
         except KeyError:
             collections = []
-        print(fd)
-        file = db.upload_file_to_collection(location_name, base_collection_name, fd, lazy=1, update=False)
-        m, n, t = cfupload_variables(db, file, base_collection_name, collections)
+        file = db.upload_file_to_collection(location_name, base_collection.name, fd, lazy=1, update=False)
+        m, n, t = cfupload_variables(db, file, base_collection.name, collections)
         msgs.append(m)
         nv += n
         t += n

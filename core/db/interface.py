@@ -158,6 +158,27 @@ class CollectionDB:
         c.do_empty(force, unique_only)
         c.delete()
 
+    def collection_delete_subdirs(self, collection, self_destruct=False):
+        """ 
+        This deletes all the subdirectories of a specific collection,
+        that is, all the collections which hold variables which are 
+        described by the files of the parent collection. 
+        Do not use the self_destruct argument, that's for internal use.
+        """
+        removed = 0
+        child_relationships = collection.related_to.filter(predicate="parent_of")
+        if child_relationships:
+            for relation in child_relationships:
+                child = relation.related_to
+                removed += self.collection_delete_subdirs(child, self_destruct=True)
+        if self_destruct:
+            if collection.n_files!=0:
+                raise PermissionError('Sub directory {c} contains files. Cannot delete')
+            collection.delete()
+            return removed+1
+        else:
+            return removed
+
     def collection_find_all_with_variable(self, variable):
         """Find all collections with a given variable"""
         coldict = {}
@@ -380,6 +401,14 @@ class CollectionDB:
                 raise ValueError(f'{properties} describes multiple files')
         return fset[0]
 
+    def files_qsdelete(self, queryset):
+        """ 
+        Delete a specific set of files returned from some query against the file database
+        """
+        if queryset.model != File:
+            raise PermissionError(f'Attempt to delete a queryset of{queryset.model} with files_delete')
+        queryset.delete()
+    
     def files_retrieve_from_variables(self, variables):
         files = File.objects.filter(variable__in=variables)
         return files
@@ -599,23 +628,24 @@ class CollectionDB:
             )
 
 
-    def relationships_retrieve(self, collection, relationship=None):
+    def relationships_retrieve(self, collection, outbound=True, relationship=None):
         """
-        Find all relationships to <collection>, optionally
+        Find all relationships from or to a  <collection>, optionally
         which have <relationship> as the predicate.
         """
         #def retrieve_relationships(self, collection, relationship=None):
         c = Collection.objects.get(name=collection)
         if relationship:
-            try:
-                r = Relationship.objects.filter(
-                        predicate=relationship, subject=c
-                        ).all()
-                return r
-            except KeyError:
-                return []
+            if outbound:
+                r = c.related_to.objects 
+            else:
+                r = c.subject.objects
+            return r.filter(predicate=relationship).all()
         else:
-            return c.related_to
+            if outbound:
+                return c.related_to.all()
+            else:
+                return c.subject.all()
 
 
     def tag_collection(self, collection_name, tagname):

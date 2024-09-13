@@ -146,9 +146,9 @@ def test_add_relationships(test_db):
     """
     test_db.relationships_add('dummy1', 'dummy3', 'parent_of', 'child_of')
     x = test_db.relationships_retrieve('dummy1', 'parent_of')
-    assert ['dummy1'] == [j.subject.name for j in x]
+    assert [('dummy1','dummy3'),('dummy1','dummy3')] == [(j.subject.name,j.related_to.name) for j in x]
     x = test_db.relationships_retrieve('dummy3', 'child_of')
-    assert ['dummy3', ] == [j.subject.name for j in x]
+    assert ['dummy3'] == [j.subject.name for j in x]
 
 def test_remove_from_collection(test_db):
     """

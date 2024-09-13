@@ -78,7 +78,7 @@ def test_upload_parsed_dict(inputfield, test_db):
     v1 = test_db.variables_retrieve_by_properties({'identity':'specific_humidity'})[0]
     # I can't seem to get proper test isolation, so for now, let's just delete the things
     # that intefere with other tests.
-    v1.domain.delete()
+    print('parsing deletion attempt')
     v1.delete()
 
   
