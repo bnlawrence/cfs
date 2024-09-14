@@ -3,8 +3,9 @@ import os
 from django import template
 from django.db.models import Q, Count,OuterRef, Subquery
 
-from core.db.models import (Cell_MethodSet, Cell_Method, Collection, Domain, File, Location,
-                        Protocol, Relationship, Tag, Variable, Directory, Value, VALUE_KEYS)
+from core.db.models import (Aggregation, Fragment, Cell_MethodSet, Cell_Method, Collection, 
+                            Domain, File, Location,
+                            Protocol, Relationship, Tag, Variable, Directory, Value, VALUE_KEYS)
 
 from tqdm import tqdm
 
@@ -776,6 +777,22 @@ class CollectionDB:
         c.save()
         loc.save()
         return results
+
+    def variable_add_fragments(self, variable, props):
+        """
+        As we add variables, we can find CFA fragments, each of
+        which had better be new for now!
+        """
+        #Currently expecting fproperties
+        #FIXME: Lots to do with base locations for CFA files
+        keys = ['units','calendar','bounds']
+        a = Aggregation(**{k:props[k] for k in keys})
+        a.save()
+        for p, n in zip(props['filenames'],props['cells']):
+            size = n*variable.domain.size
+            f = Fragment(name=p,size=size)
+            f.save()
+            a.fragments.add(f)
 
 
     def variable_add_to_file_and_collection(self, variable, file, collection_name):

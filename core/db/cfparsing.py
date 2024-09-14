@@ -1,5 +1,8 @@
 
 import cf
+import h5netcdf as h5
+import numpy as np
+from pathlib import Path
 
 def manage_types(value):
     """
@@ -44,6 +47,51 @@ class Lookup:
                 return self._known['unknown'][key]
         else:
             raise AttributeError(f"'{self.__class__.__name__}' has no information about '{key}'")
+
+class CFAhandler:
+    def __init__(self):
+        """ Opens the aggregation file for further parsing """
+        self.dataset = None
+
+    def parse_fragment_info(self,field):
+        """
+        Should return the necessary information for a fragment to be located in coordinate 
+        space. For now I just return some best guesses. I need David to help me find out
+        how to get at the cfa_locations variable ...     
+        """
+        if self.dataset is None:
+            #FIXME: All this file handling is brittle. Help David!
+            files =  field.get_filenames()
+            cfa_file = [f for f in files if Path(f).suffix == '.cfa'][0]
+            self.dataset = h5.File(cfa_file,'r')
+            #FIXME: Note file name ordering assumption
+            self.filenames = sorted([f for f in files if Path(f).suffix !='.cfa'])
+        ncvar = field.nc_get_variable()
+        alocations = self.__get_cfalocation(ncvar)
+        tdim = field.construct('T')
+        if tdim.has_bounds():
+            bounds = tdim.bounds.data.array
+            #FIXME: Do this with numpy
+            newbounds = []
+            left=0
+            for n in alocations:
+                right = left + n -1
+                newbounds.append([bounds[left][0],bounds[right][1]])
+                left+=n
+        else:
+            raise NotImplementedError
+        keys = ['filenames','bounds','cells','units','calendar']
+        return {k:v for k,v in zip(keys,[self.filenames, np.array(newbounds), alocations, tdim.units, tdim.calendar])}
+    
+    def __get_cfalocation(self,ncvar):
+        """ Find the CFA location by going down the rabbit hole"""
+        ncv = self.dataset.variables[ncvar]
+        aggregated_data = ncv.attrs['aggregated_data']
+        parsed_aggregated_data = dict(zip(aggregated_data.split()[::2], aggregated_data.split()[1::2]))
+        location = parsed_aggregated_data['location:']
+        #FIXME: this assumes time is the first dimension 
+        location = self.dataset.variables[location][:][0]
+        return location
 
 
 def parse2atomic_name(field):
@@ -116,7 +164,7 @@ def infer_temporal_resolution(field):
     #    return 'unknown'
 
 
-def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None):
+def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None, cfa=False):
     """
     Parse a list of cf-python fields into a list of properties suitable for loading into the database.
     : fields : a list of cf fields
@@ -124,13 +172,18 @@ def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None):
             if none, we will infer temporal resolution by inspecting the time coordinate if 
             it exists.
     : lookup_class : optional. see description in cfparse_field_for_domain
+    : cfa : True if aggregated fields
     : returns : a list of dictionaries of metadata properties describing
                 each of the cf fields (a subset of the variables) found in the file.
     """
     descriptions = []
     # loop over fields in file (not the same as netcdf variables)
+    if cfa:
+        cfahandler=CFAhandler()
     for v in fields:
         description = {'atomic_origin': parse2atomic_name(v), 'identity':v.identity()}
+        if cfa:
+            description['cfa'] = cfahandler.parse_fragment_info(v)
         properties = v.properties()
         for k in ['standard_name','long_name','realm']:
             description[k] = v.get_property(k,None)
@@ -154,3 +207,6 @@ def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None):
         description['_proxied'] = {k:manage_types(v) for k,v in properties.items()}
         descriptions.append(description)
     return descriptions
+
+
+

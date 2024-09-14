@@ -14,6 +14,35 @@ def sizeof_fmt(num, suffix="B"):
         num /= 1024.0
     return "%.1f%s%s" % (num, "Yi", suffix)
 
+
+class Aggregation(models.Model):
+    """ 
+    Holds in formation to allow the construction of subsets
+    """
+    id = models.AutoField(primary_key=True)
+    units = models.CharField(max_length=12)
+    calendar = models.CharField(max_length=12)
+    fragments = models.ManyToManyField("Fragment")
+    bounds = models.BinaryField()
+
+class Fragment(models.Model):
+    """ Fragment sizes are estimates, unlike actual file sizes """
+    class Meta:
+        app_label = "db"
+
+    path = models.CharField(max_length=256)
+    checksum = models.CharField(max_length=1024)
+    checksum_method = models.CharField(max_length=256)
+    size = models.IntegerField()
+    format = models.CharField(max_length=256, default="Unknown format")
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=256)
+    # Fragment Files may be found in multiple locations, and there may be 
+    # multiple copies in different collections in one location, but
+    # don't count them as extras. 
+    locations = models.ManyToManyField("Location")
+
+
 class Value(models.Model):
     """ 
     We hold all the terms used as values of properties, so 
@@ -99,7 +128,7 @@ class Location(models.Model):
         return f'{self.name} ({sizeof_fmt(self.volume)})'
 
 
-class File(models.Model):
+class File(Fragment):
     """
     Files are the physical manifestation that we have to manage, so
     we need a bit of language. Each entry in the file table is 
@@ -118,20 +147,7 @@ class File(models.Model):
     we don't allow that to happen. 
 
     """
-    class Meta:
-        app_label = "db"
-
-    path = models.CharField(max_length=256)
-    checksum = models.CharField(max_length=1024)
-    checksum_method = models.CharField(max_length=256)
-    size = models.IntegerField()
-    format = models.CharField(max_length=256, default="Unknown format")
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=256)
-    # Files may be found in multiple locations, and there may be 
-    # multiple copies in different collections in one location, but
-    # don't count them as extras. 
-    locations = models.ManyToManyField(Location)
+   
 
     def __str__(self):
         locations = ','.join([x.name for x in self.locations.all()])

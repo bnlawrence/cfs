@@ -30,7 +30,6 @@ class Posix:
         subcollections=False,
         checksum=None,
         regex=None,
-        match='*.nc',
     ):
         """
         Add a new collection with all netcdf files below <path_to_collection_head>,
@@ -65,6 +64,14 @@ class Posix:
             "_regex",
         ]
 
+        if regex is None:
+            regex = '*.nc'
+        cfa = regex == '*.cfa'
+
+        if regex not in ['*.nc','*.cfa']:
+            raise NotImplementedError
+
+
         # record details of how collection was established as collection properties
         for k,v in zip(keys,args):
             c[k]=v
@@ -73,7 +80,7 @@ class Posix:
         # walk the directory view
         basedir = Path(path_to_collection_head)
         dbfiles = []
-        for p in basedir.rglob(match):
+        for p in basedir.rglob(regex):
             if p.is_file():
                 if subcollections:
                     parents = get_parent_paths(p,basedir,collection_head_name)
@@ -94,7 +101,7 @@ class Posix:
                     #ppd = self.db.collection_retrieve(pd)
                     self.db.relationships_add(pd,cc.name,'parent_of','subdir_of')
 
-        msg = cfupload_ncfiles(self.db, self.location, c, dbfiles)
+        msg = cfupload_ncfiles(self.db, self.location, c, dbfiles, cfa=cfa)
         print(msg)
      
 
