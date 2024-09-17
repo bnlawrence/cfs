@@ -133,14 +133,24 @@ def extract_cfsdomain(field, lookup_class=Lookup):
     }
     return domain_properties
 
-def infer_temporal_resolution(field):
+def extract_cfstemporal(field, temporal_resolution):
+    """ Extract the information needed for a CFS temporal domain"""
+    tdim = field.construct('T')
+    if temporal_resolution is None:
+        temporal_resolution = infer_temporal_resolution(tdim)
+    data = field.construct('T').data
+    return {'interval':temporal_resolution, 'starting':float(data[0].array[0]),
+            'ending': float(data[-1].array[0]), 'units':tdim.units, 'calendar':tdim.calendar}
+
+
+def infer_temporal_resolution(tdim):
     """
     Guess temporal resolution from cell spacing. 
     Will likely need fixing when we confront it with real data from the wild. 
     Thanks David!
     """
     #try:
-    data = field.construct('T').data
+    data = tdim.data
     delta = (data[2]-data[0])/2
     delta.Units = cf.Units('day')
     if delta < cf.D(1):   #hours
@@ -155,13 +165,10 @@ def infer_temporal_resolution(field):
     elif delta> cf.D(359) and delta < cf.D(367): 
         return '1y'
     else:
-        if field.construct('T').calendar == '360_day':
+        if tdim.calendar == '360_day':
             return f'{int(delta/360)}y'
         else:
             return f'{int(delta/360.25)}y'
-    #except Exception as e:
-    #    print(e)
-    #    return 'unknown'
 
 
 def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None, cfa=False):
@@ -189,14 +196,11 @@ def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None, cfa
             description[k] = v.get_property(k,None)
             if description[k] is not None:
                 properties.pop(k)
-        if temporal_resolution is None:
-            description['temporal_resolution'] = infer_temporal_resolution(v)
-        else:
-            description['temporal_resolution'] = temporal_resolution
+        description['time_domain'] = extract_cfstemporal(v, temporal_resolution)
 
         if lookup_class is None:
             lookup_class=Lookup
-        description['domain'] = extract_cfsdomain(v, lookup_class)
+        description['spatial_domain'] = extract_cfsdomain(v, lookup_class)
 
         cmlist = []
         for m, cm in v.cell_methods().items():

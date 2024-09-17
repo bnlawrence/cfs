@@ -75,8 +75,8 @@ def test_field_parsing(inputfield):
     adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_class=None)[0]
     assert adict['identity'] == 'specific_humidity'
     assert 'units' in adict['_proxied']
-    assert adict['temporal_resolution'] == '1m'
-    assert adict['domain']['name'] == 'test'
+    assert adict['time_domain']['interval'] == '1m'
+    assert adict['spatial_domain']['name'] == 'test'
     assert 'atomic_origin' in adict
 
 def test_upload_parsed_dict(inputfield, test_db):

@@ -68,8 +68,8 @@ def test_cfa_view(django_dependencies, cfa_resources):
     """ 
     Test uploading a cfa file as normal nc file
     """
-    for f in cfa_resources.glob('*.cfa'):
-        os.system(f'ncdump {f}')
+    #for f in cfa_resources.glob('*.cfa'):
+    #    os.system(f'ncdump {f}')
     posix_path = cfa_resources
     test_db, p, ignore = django_dependencies
     p.add_collection(
@@ -86,6 +86,20 @@ def test_fragments(django_dependencies):
     """ 
     when we added the cfa file we should have added
     some fragments, let's look at them
+    """
+    test_db, ignore, ignore = django_dependencies
+    files = test_db.files_retrieve_in_collection('posix_cfa_example')
+    from core.db.models import File
+    files2 = File.objects.all()
+    print(f'{files2.count()} files found')
+    for f in files2:
+        print(f) 
+    for f in files:
+        print(f)
+
+def test_fragment_deletion_with_variables(django_dependencies):
+    """ need to make sure fragment and aggregation descriptins are deleted
+    with their CFFA files and/or variables. 
     """
     raise NotImplementedError
 

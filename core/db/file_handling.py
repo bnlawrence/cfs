@@ -22,6 +22,7 @@ def cfupload_variables(db, file, collection, extra_collections, cfa=False):
             cfa = d.pop('cfa')
         v = db.variable_retrieve_or_make(d)
         if cfa:
+            cfa['cfa_file']=file
             db.variable_add_fragments(v, cfa)
         db.variable_add_to_file_and_collection(v, file, collection)
         for c in extra_collections:

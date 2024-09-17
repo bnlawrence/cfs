@@ -3,9 +3,10 @@ import os
 from django import template
 from django.db.models import Q, Count,OuterRef, Subquery
 
-from core.db.models import (Aggregation, Fragment, Cell_MethodSet, Cell_Method, Collection, 
-                            Domain, File, Location,
-                            Protocol, Relationship, Tag, Variable, Directory, Value, VALUE_KEYS)
+from core.db.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
+                            Domain, File, FileType, Location, 
+                            VariableProperty, VariablePropertyKeys,
+                            Relationship, Tag, TimeDomain, Variable)
 
 from tqdm import tqdm
 
@@ -17,6 +18,10 @@ def get_obj_field(obj, key):
 #FIXME: When and how is the filter used, it's come from the old db.py, but it's a GOB thing.
 
 class CollectionDB:
+
+
+    def __init__(self):
+        self.varprops = {v:k for k, v in VariablePropertyKeys.choices}
 
     @property
     def _tables(self):
@@ -31,20 +36,29 @@ class CollectionDB:
         model instances for inserting and querying the database
         """
 
-        definition, extras = {},{}
+        definition, extras = {'key_properties':[]},{}
+        
         for key in varprops:
-            if key in VALUE_KEYS:
-                value, created = Value.objects.get_or_create(value=varprops[key])
-                definition[key]=value
-            elif key == 'domain':
+            if key in VariablePropertyKeys.labels:
+                ekey = self.varprops[key]
+                out_value, create = VariableProperty.objects.get_or_create(
+                                        key=ekey, value=varprops[key])
+                definition['key_properties'].append(out_value)
+            elif key == 'spatial_domain':
                 definition[key]=self.domain_get_or_create(varprops[key])
+            elif key == 'time_domain':
+                definition[key]=self.temporal_get_or_create(varprops[key])
             elif key == 'cell_methods':
                 method_set = self.cell_methods_get_or_create(varprops[key])
                 definition[key]=method_set
+            elif key == 'in_file':
+                definition[key]=varprops[key]
             else:
                 extras[key]=varprops[key]
         if not ignore_proxy:
             definition['_proxied']=extras
+        if 'cell_methods' not in definition:
+            definition['cell_methods'] = None
         return definition
 
     def cell_methods_get_or_create(self, methods):
@@ -495,32 +509,19 @@ class CollectionDB:
             .all()
         )
 
-    def location_create(
-        self, location, protocols=[], overwrite=False):
+    def location_create(self, location):
         """
         Create a storage <location>. The database is ignorant about what
         "location" means. Other layers of software care about that.
-        However, it may have one or more protocols associated with it.
         """
         #def create_location(
         loc = Location.objects.filter(name=location)
         if loc:
-            loc = loc[0]
-        if not loc:
-            loc = Location.objects.create(name=location, volume=0)
-        if overwrite and loc:
-            loc.delete()
-            loc = Location.objects.create(name=location, volume=0)
-        if protocols:
-            existing_protocols = self.protocols_retrieve()
-            for p in protocols:
-                if p not in existing_protocols:
-                    pdb = Protocol.objects.create(name=p)
-                loc.protocols.add(pdb)
+            raise PermissionError('Cannot create {location} - it already exists')
         else:
-            protocols = [Protocol.objects.get_or_create(name="none")[0]]
-        loc.save()
-        return loc
+            loc = Location.objects.create(name=location, volume=0)
+            loc.save()
+            return loc
 
 
     def location_delete(self, location_name):
@@ -681,6 +682,17 @@ class CollectionDB:
         tag = Tag(name=tagname)
         c.tags.remove(tag)
 
+    def temporal_get_or_create(self, properties):
+        """ 
+        Get or create a time domain instance from the property string
+        """
+        td, created = TimeDomain.objects.get_or_create(**properties)
+        if created:
+            td.save()
+        return td
+  
+       
+
     def upload_file_to_collection(self, location, collection, f, lazy=0, update=True):
         """
         Convenience API to upload_files_to_collection, simply wraps <f> into a list
@@ -785,25 +797,14 @@ class CollectionDB:
         """
         #Currently expecting fproperties
         #FIXME: Lots to do with base locations for CFA files
-        keys = ['units','calendar','bounds']
+        keys = ['units','calendar','bounds','cfa_file']
         a = Aggregation(**{k:props[k] for k in keys})
         a.save()
         for p, n in zip(props['filenames'],props['cells']):
-            size = n*variable.domain.size
-            f = Fragment(name=p,size=size)
-            f.save()
-            a.fragments.add(f)
-
-
-    def variable_add_to_file_and_collection(self, variable, file, collection_name):
-        """
-        Add a variable instance to a file instance and add it into a collection
-        (identified by name)
-        """
-        self.variable_add_to_collection(collection_name, variable)
-        variable.in_files.add(file)
-        variable.save()
-    
+            size = n*variable.spatial_domain.size
+            f = File(name=p,size=size)
+            f.part_of.add(a)
+            f.save()    
 
     def variable_add_to_collection(self, collection, variable):
         """
@@ -828,30 +829,66 @@ class CollectionDB:
             return results
         return results[0]
 
-    def variable_retrieve_by_query(self, keys, values):
-        """Retrieve variable by arbitrary queru"""
-        queries = []
-        for key,value in keys,values:
-            if key in [
-                "id" "long_name",
-                "standard_name",
-                "cfdm_size",
-                "cfdm_domain",
-                "cell_methods",
-            ]:
-                queries.append(getattr(Variable, key) == value)
+    def variable_retrieve_by_queries(self, queries, from_collection=None):
+        """Retrieve variable by a list of common query types, limit queries to collection
+        if wished.
+        Each element of the list is a key,value pair
+        : key : Can be one of the following
+                'id,' 'long_name', 'standard_name', 'temporal_resolution', 'nominal_resolution'
+                'cell_method', 'spatial_domain', 'time_domain', 'in_file'
+                It can also be any other arbitrary property which we might expect to find
+                in the proxied properties. But querying on those will be very slow!
+        : values : 'id','long_name','standard_name' are identity strings
+                   'time_resolution' : an integer describing a temporal resolution interval
+                   'nominal_resolution' : string describing a nominal spatial resolution
+                   'cell_method' : a db cell method instance
+                   'spatial_domain ' : a db (spatial) domain instance
+                   'time_domain' :  a db time domain instance
+                   'in_file': a db file instance
+        """
+        if from_collection is None:
+             base = Variable.objects
+        else:
+            if not isinstance(from_collection,Collection):
+                from_collection = Collection.objects.get(name=from_collection)
+            base = from_collection.variables
+           
+        proxied = []
+        for key,value in queries:
+            print('Query step', key, value)
+            if key == 'key_properties':
+                base = base.filter(key_properties=value)
+            elif key in ["spatial_domain","temporal_domain"]:
+                base = base.filter(**{key:value})
+            elif key in ['in_file']:
+                base = base.filter(in_file=value)
+            elif key == "cell_methods":
+                base = base.filter(cell_methods__methods=value)
+            elif key == 'temporal_resolution':
+                base = base.filter(time_domain__interval=value)
+            elif key == 'nominal_resolution':
+                base = base.filter(spatial_domain__nominal_resolution=value)
             else:
-                queries.append(Variable.with_other_attributes(key, value))
-            if key == "in_files":
-                queries.append([value == k for k in Variable.in_files])
-            if len(queries) == 0:
-                raise ValueError("No query received for retrieve variable")
-            elif len(queries) == 1:
-                results = Variable.objects.all()
-            else:
-                # FIXME make sure queries format is DJANGOfyed
-                results = Variable.objects.filter(*queries).all()
-            return results, queries
+                #it's a proxied field, ideally we'd do this, but we can't, doesn't work with sqllite
+                #base = base.filter(_proxied__contains={key:value})
+                proxied.append((key,value))
+                
+        if proxied:
+            print(f'Querying {[k for k,v in proxied]} will be horrendously slow. Try to avoid')
+            # If it's a regular need we should move this key value pair to a term.
+            # At this point we have no good choices for speed
+            candidates = base.all()
+            for k,v in proxied:
+                results = []
+                for c in candidates:
+                    if k in c:
+                        if c[k]==v:
+                            results.append(c)
+                candidates = results
+            return results
+        else:
+            return base.all()
+    
 
     def variable_retrieve_in_collection(self, collection):
         collection = self.collection_retrieve(collection)
@@ -861,29 +898,25 @@ class CollectionDB:
     def variable_retrieve_or_make(self, varprops):
         """
         If there is a variable corresponding to varprops with the same full set of properties, 
-        return it, otherwise create it. Varprops should be a dictionary which inclues at least 
-        an identiy and an atomic origin.
+        return it, otherwise create it. Varprops should be a dictionary which includes at least 
+        an identiy and an atomic origin in the key properties
         """
 
         props = self._construct_properties(varprops)
-        required = ['atomic_origin','identity']
-        invalid_make = False
-        for x in required:
-            if x not in props:
-                raise ValueError(f'Cannot do variable make or retrieve without {required} properties')
-        
-        var, created = Variable.objects.get_or_create(**props)
-        if created:
-            var.save()
+        kp = [p.key for p in props['key_properties']]
+        if 'ID' not in kp:
+            print('Failing id ', kp)
+            raise ValueError('Variable definitions must include identity')
+        if len(props)!= 6:
+            print(f'Var Failing {len(props)} ',props)
+            raise ValueError('Insufficient properties to create a variable')
+        args = [props[k] for k in ['_proxied','key_properties','spatial_domain',
+                                   'time_domain','cell_methods','in_file']]
+        var, created = Variable.get_or_create_unique_instance(*args)
         return var
-    
-
 
     def variable_search(self, key, value):
-        results = self.variables_retrieve_all(key, value)
-        if not results.exists():
-            return results
-        return results[0]
+        return self.variable_retrieve_by_queries([(key,value),])
     
     def variables_all(self):
         return Variable.objects.all()
@@ -897,68 +930,41 @@ class CollectionDB:
             var.delete()
 
     def variables_retrieve_by_key(self, key, value):
-        """
-        Retrieve all variables that matches arbitrary property
-        describe by a key value pair, unless key = all, in which 
-        case return all variables.
-        """
-        proxied = False
-        if key in VALUE_KEYS:
-            #value = Value.objects.get(key=key,value=value)
-            pass
-        elif key == 'domain':
-            value = Domain.objects.get(name=value)
-        elif key == 'cell_method':
-            value = Cell_Method(**value)
-        elif key in ['in_collections' or 'in_files']:
-            raise NotImplementedError
-        else:
-            print('This will be horrendously slow. Try to avoid')
-            results = []
-            for v in Variable.objects.all():
-                if key in v:
-                    if v[key] == value:
-                        results.append(v)
-            return results
-             
-        args = {key:value}
-        results = Variable.objects.filter(**args)
-        if not results.exists():
-            return results
-        return results
+        return self.variable_retrieve_by_queries([(key,value),])
+
 
     def variables_retrieve_by_properties(self, properties, from_collection=None, unique=False):
         """
-        Retrieve variable by arbitrary set of properties 
+        Retrieve variable by arbitrary set of properties expressed as a dictionary.
+        (Basically an interface to retrieve_by_queries.)
         """
-        filters = []
-        for key in ['cell_methods','in_file']:
-            if key in properties:
-                filters.append((key,properties.pop(key)))
-        usable = self._construct_properties(properties, ignore_proxy=True)
-        
-        if from_collection is None:
-            variables = Variable.objects.filter(**usable)
+        queries = []
 
-        else:
-            if not isinstance(from_collection,Collection):
-                from_collection = Collection.objects.get(name=from_collection)
-            variables = from_collection.variables.filter(**usable)
-        for key,value in filters:
-            if key == 'cell_methods':
-                for x in value:
-                    cm = self.cell_method_retrieve(*x) 
-                    variables=variables.filter(cell_methods__methods=cm)
-            elif key == 'in_file':
-                if not isinstance(value,File):
-                    value = self.file_retrieve_by_properties(**value)
-                variables=variables.filter(in_files=value)
+        for k in ['in_file','cell_methods']:
+            if k in properties:
+                v = properties.pop(k)
+                if k == 'in_file':
+                    if not isinstance(v, File):
+                        v = self.file_retrieve_by_properties(**v)
+                    queries.append((k,v))
+                elif k == 'cell_methods':
+                    for x in v:
+                        cm = self.cell_method_retrieve(*x)
+                        queries.append(('cell_methods', cm))
+
+        properties = self._construct_properties(properties)
+        for present in ['_proxied','key_properties','cell_methods']:
+            if not properties[present]:
+                properties.pop(present)
+        for k, v in properties.items():
+            if k == 'key_properties':
+                for vv in v:
+                    queries.append((k,vv))
             else:
-                raise NotImplementedError('Unknown variable retrieval option: {key},{value}')
+                queries.append((k,v))
+        results = self.variable_retrieve_by_queries(queries, from_collection=from_collection)
         if unique:
-            c = variables.count()
-            if c != 1:
+            if len(results) > 1:
                 raise ValueError('Query retrieved multiple variables ({c}) - but uniqueness was requested')
-            return variables.first()
-        return variables.all()
+        return results
         

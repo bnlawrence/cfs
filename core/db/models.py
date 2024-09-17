@@ -1,8 +1,9 @@
 from django.db import models
-from django.db.models import Q, Count,OuterRef, Subquery
+from django.db.models import Q, Count,OuterRef, Subquery, UniqueConstraint
 from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_delete, m2m_changed, post_delete
 import hashlib
+import enum
 
 from django.dispatch import receiver
 
@@ -15,49 +16,8 @@ def sizeof_fmt(num, suffix="B"):
     return "%.1f%s%s" % (num, "Yi", suffix)
 
 
-class Aggregation(models.Model):
-    """ 
-    Holds in formation to allow the construction of subsets
-    """
-    id = models.AutoField(primary_key=True)
-    units = models.CharField(max_length=12)
-    calendar = models.CharField(max_length=12)
-    fragments = models.ManyToManyField("Fragment")
-    bounds = models.BinaryField()
 
-class Fragment(models.Model):
-    """ Fragment sizes are estimates, unlike actual file sizes """
-    class Meta:
-        app_label = "db"
-
-    path = models.CharField(max_length=256)
-    checksum = models.CharField(max_length=1024)
-    checksum_method = models.CharField(max_length=256)
-    size = models.IntegerField()
-    format = models.CharField(max_length=256, default="Unknown format")
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=256)
-    # Fragment Files may be found in multiple locations, and there may be 
-    # multiple copies in different collections in one location, but
-    # don't count them as extras. 
-    locations = models.ManyToManyField("Location")
-
-
-class Value(models.Model):
-    """ 
-    We hold all the terms used as values of properties, so 
-    as to minimise database stuff and speed up 
-    querying
-    """
-    id = models.AutoField(primary_key=True)
-    value = models.CharField(max_length=1024, null=True)
-    def __str__(self):
-        if self.value is not None:
-            return self.value
-        else:
-            return "None"
-
-VALUE_KEYS = ['standard_name','long_name', 'identity', 'atomic_origin','temporal_resolution']
+VALUE_KEYS = ['standard_name','long_name', 'identity', 'atomic_origin']
 
 class Domain(models.Model):
     """ 
@@ -76,40 +36,30 @@ class Domain(models.Model):
     nominal_resolution = models.CharField(max_length=12)
     size = models.IntegerField()
     coordinates = models.CharField(max_length=256)
+    bbox_tl = models.FloatField(null=True)
+    bbox_tr = models.FloatField(null=True)
+    bbox_bl = models.FloatField(null=True)
+    bbox_br = models.FloatField(null=True)
 
     def __str__(self):
         return f'{self.name}({self.nominal_resolution})'
-
-
-class VDM(models.Model):
-    def __len__(self):
-        return len(self._proxied)
-
-    def __iter__(self):
-        return iter(self._proxied)
-
-    def __getitem__(self, key):
-        return self._proxied[key]
-
-    def __contains__(self, key):
-        return key in self._proxied
-
-    def __setitem__(self, key, value):
-        self._proxied[key] = value
-
-    def __delitem__(self, key):
-        del self._proxied[key]
+    
+class TimeDomain(models.Model):
 
     class Meta:
-        app_label = "db"
+        app_label="db"
 
-
-class Protocol(models.Model):
-    class Meta:
-        app_label = "db"
-
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=256)
+    interval =  models.IntegerField()
+    units = models.CharField(max_length=12,default='days')
+    calendar = models.CharField(max_length=12, default="standard")
+    starting = models.FloatField()
+    ending = models.FloatField()
+    
+    def resolution(self):
+        return f'{self.interval} {self.units}'
+    
+    def __str__(self):
+        return f'{self.interval} ({self.units}) from {self.starting} to {self.ending}'
 
 
 class Location(models.Model):
@@ -119,16 +69,23 @@ class Location(models.Model):
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=256)
     volume = models.IntegerField()
-    protocols = models.ManyToManyField(Protocol)
     
-    @property
-    def protocolset(self):
-        return self.protocols.all()
     def __str__(self):
         return f'{self.name} ({sizeof_fmt(self.volume)})'
 
+class FileType(models.TextChoices):
+    """ 
+    Types of file recognised:
+     - CFA Atomic Dataseet files, CFA Quark Files
+     - Standalone Files, Fragment Files
+    """
 
-class File(Fragment):
+    ATYPE = 'A', "CFA File holds atomic dataset(s)"
+    QTYPE = 'Q', "CFA File holds quark(s)"
+    STYPE = 'S', "Standalone File"
+    FTYPE = 'F', "Fragment File"
+
+class File(models.Model):
     """
     Files are the physical manifestation that we have to manage, so
     we need a bit of language. Each entry in the file table is 
@@ -137,8 +94,8 @@ class File(Fragment):
     This file entity keeps track of the presence of this file in
     various locations, but NOT, the presence of the file in multiple
     collections. Collections know what files they contain.
-    #FIXME: Both collections and locations handle deletion of files
-    carefully!
+    Files that are part of aggregations are hidden from collections,
+    only the aggregation file appears there.
 
     It is possible for one logical file to have more than one physical
     representation in one storage location, but we don't care about thos
@@ -148,23 +105,50 @@ class File(Fragment):
 
     """
    
+    class Meta:
+        app_label = "db"
+
+    id = models.AutoField(primary_key=True)
+    
+    # mandatory properties
+    name = models.CharField(max_length=256)
+    path = models.CharField(max_length=256)
+    size = models.IntegerField()
+    type = models.CharField(max_length=1,choices=FileType)
+    # mandatory for our logic, not for django:
+    locations = models.ManyToManyField("Location")
+
+    #optional properties:
+    checksum = models.CharField(max_length=1024, null=True)
+    checksum_method = models.CharField(max_length=256,null=True)
+    uuid = models.UUIDField(null=True)
+    format = models.CharField(max_length=256, null=True)
+    cfa_file = models.ForeignKey(
+        'self', on_delete=models.SET_NULL,
+        related_name='fragments',
+        null=True
+    )
 
     def __str__(self):
+        """ 
+        String representation.
+        """
         locations = ','.join([x.name for x in self.locations.all()])
         return f"{self.name}({locations})"
     
     def dump(self):
         """ Provide a comprehensive view of this file """
         s = f"{self.name} ({self.format},{self.size}, checksum: {self.checksum}[{self.checksum_method}])\n"
-        s += f"[{self.path}]] is in locations:\n"
-        s += '\n'.join([x.name for x in self.locations.all()])
+        s += f"{self.uid}[{self.type}]] is in locations:\n"
+        s += ','.join([x.name for x in self.locations.all()])
+        s += f'\n{self.path}'
         return s
     
     def delete(self,*args,**kwargs):
         """ 
         When a file is deleted, we need to make sure that the volume associated with
-        it is removed from any collections and locations. We also need to delete any
-        variables where this is the last file which references it. 
+        it is removed from any collections and locations. 
+        Variables will be automatically deleted because their ForeignKey cascade makes that happen.
         """
         for c in self.collection_set.all():
             c.volume -= self.size
@@ -173,17 +157,6 @@ class File(Fragment):
             l.volume -= self.size
             l.save()
         candidates = self.variable_set.all()
-        for var in candidates:
-            if var.in_files.count() == 1:
-                var.delete()
-        #chatgpt wants me to call super().delete(*args,**kwargs) here
-        # but that clashes with the on_file_delete hooks, so we don't do that
-        #to avoid an infinite loop!
-
-@receiver(pre_delete, sender=File)
-def on_file_delete(sender, instance, **kwargs):
-    # This will be executed before a File object is deleted
-    instance.delete()  # Call the custom file deletion logic
 
 
 class Tag(models.Model):
@@ -197,14 +170,13 @@ class Tag(models.Model):
 #    collections = models.ManyToManyField(Collection)
 
 
-class CollectionProperty(models.Model):
+class CollectionType(models.Model):
     class Meta:
         app_label = "db"
 
     id = models.AutoField(primary_key=True)
     value = models.TextField()
     key = models.CharField(max_length=128)
-    # Collection_id = models.ForeignKey(Collection)
 
 
 class Collection(models.Model):
@@ -239,7 +211,7 @@ class Collection(models.Model):
     id = models.AutoField(primary_key=True)
     batch = models.BooleanField()
     files = models.ManyToManyField(File)
-    properties = models.ManyToManyField(CollectionProperty)
+    type = models.ManyToManyField(CollectionType)
     tags = models.ManyToManyField(Tag)
     variables = models.ManyToManyField("Variable")
 
@@ -341,7 +313,6 @@ def intercept_file_removal(sender, instance, action, reverse, model, pk_set, **k
             instance.volume -= file.size
 
 
-
 class Relationship(models.Model):
     class Meta:
         app_label = "db"
@@ -390,10 +361,43 @@ class Cell_MethodSet(models.Model):
             method_set.methods.set(methods)  # Set methods if it's a new Cell_MethodSet
         return method_set
 
+class VariablePropertyKeys(models.TextChoices):
+    """ 
+    Variable properties that should get converted to variable
+    properties (other properties are inserted into _proxied).
+    """
+
+    SNAME = 'SN', "standard_name"
+    LNAME = 'LN', "long_name"
+    IDENT = 'ID', "identity"
+    ATOMIC = 'AO', "atomic_origin"
+
+    def mykey(self,myvalue):
+        reversed = {v:k for k,v in self.choices}
+        return reversed[myvalue]
+
+class VariableProperty(models.Model):
+    """ 
+    We hold all the properties which get used as keys and values of 
+    heavily used properties so we can speed things up.
+    """
+    class Meta:
+        app_label = "db"
+
+    id = models.AutoField(primary_key=True)
+    key = models.CharField(max_length=2, choices=VariablePropertyKeys)
+    value = models.CharField(max_length=1024, null=True)
+    def __str__(self):
+        return f'{self.key}:{self.value}'
+
 
 class Variable(models.Model):
     class Meta:
         app_label = "db"
+        constraints = [
+            UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file'], 
+                             name='unique_combination_of_fk_fields')
+        ]
 
     def __len__(self):
         return len(self._proxied)
@@ -420,56 +424,119 @@ class Variable(models.Model):
         return True
     
     def __str__(self):
-        return self.identity.value
+        return self.get_kp('identity')
 
     id = models.AutoField(primary_key=True)
     _proxied = models.JSONField()
-    long_name = models.ForeignKey(Value, related_name='long_name', null=True, on_delete=models.CASCADE)
-    standard_name = models.ForeignKey(Value, related_name='standard_name', null=True, on_delete=models.CASCADE)
-    identity = models.ForeignKey(Value, related_name='identity', on_delete=models.CASCADE)
-    atomic_origin = models.ForeignKey(Value, related_name='atomic_origin', on_delete=models.CASCADE)
-    temporal_resolution =  models.ForeignKey(Value, related_name='temporal_resolution', null=True,on_delete=models.CASCADE)
-    domain = models.ForeignKey(Domain, null=True,on_delete=models.SET_NULL)
-    cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.SET_NULL) 
-    in_files = models.ManyToManyField(File)
+    key_properties = models.ManyToManyField(VariableProperty)
+    spatial_domain = models.ForeignKey(Domain, null=True,on_delete=models.SET_NULL)
+    time_domain = models.ForeignKey(TimeDomain, null=True, on_delete=models.SET_NULL)
+    cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.SET_NULL)
+    in_file = models.ForeignKey(File, on_delete=models.CASCADE)
 
+    def get_kp(self, key):
+        """ Return a specific key property by name """
+        # Use the mykey method from VariablePropertyKeys to map from prop_name to the enum value
+        try:
+            key_code = VariablePropertyKeys.mykey(VariablePropertyKeys, key)
+        except KeyError:
+            raise ValueError(f"'{key}' is not a valid key in VariablePropertyKeys.")
+        
+        # Search for the VariableProperty instance with the matching key
+        try:
+            var_prop = self.key_properties.get(key=key_code)
+            return var_prop.value
+        except VariableProperty.DoesNotExist:
+            return None  # Return None if no matching property is found
+
+
+    def save(self, *args, **kwargs):
+         # Check uniqueness of other fields first
+        try:
+            kp = kwargs.pop('key_properties')
+            keys = [k.key for k in kp]
+            assert 'ID' in keys
+        except:
+            # This is not normal Django behaviour, but the Variable uniqueness isn't normal Django either
+            raise ValueError('Variables must be saved with key properties, one of which must be identity!')
+        
+        existing_instance = Variable.objects.filter(
+            _proxied=self._proxied,
+            spatial_domain=self.spatial_domain,
+            time_domain=self.time_domain,
+            cell_methods=self.cell_methods,
+            in_file=self.in_file,
+            ).first()
+        
+        # Manually enforce uniqueness of key_properties in combination with the other fields
+        if existing_instance:
+
+            existing_key_properties = set(existing_instance.key_properties.all())
+            new_key_properties = set(kp)
+
+            if existing_key_properties == new_key_properties:
+                raise ValueError('An instance with this combination of fields and key_properties already exists.')
+
+        # Now that checks have passed, we can save the object
+        super().save(*args, **kwargs)  # Save the instance
+        self.key_properties.set(kp)   
+
+    @classmethod
+    def get_or_create_unique_instance(cls, _proxied, key_properties, spatial_domain, time_domain, cell_methods, in_file):
+        """ Sadly repeats a lot of the save logic"""
+        # Ensure that key_properties contains the required 'identity'
+        keys = [k.key for k in key_properties]
+        if 'ID' not in keys:
+            print(key_properties)
+            raise ValueError("One of the key_properties must be 'identity'!")
+
+        # Try to find an existing instance with the same non-ManyToMany fields
+        existing_instance = cls.objects.filter(
+            _proxied=_proxied,
+            spatial_domain=spatial_domain,
+            time_domain=time_domain,
+            cell_methods=cell_methods,
+            in_file=in_file,
+        ).first()
+
+        if existing_instance:
+            # Check if the key_properties match
+            existing_key_properties = set(existing_instance.key_properties.all())
+            input_key_properties = set(key_properties)
+
+            if existing_key_properties == input_key_properties:
+                return existing_instance, False  # Instance with matching key_properties exists
+
+        # If no matching instance is found, create a new instance
+        new_instance = cls(
+            _proxied=_proxied,
+            spatial_domain=spatial_domain,
+            time_domain=time_domain,
+            cell_methods=cell_methods,
+            in_file=in_file
+        )
+
+        # Save the new instance with the key_properties passed as kwargs
+        new_instance.save(key_properties=key_properties)
+
+        return new_instance, True  # Return the new instance and a flag indicating creation
+    
     def predelete(self):
         """ 
         When a variable is deleted, we need to make sure that any cell_methods, domains,
         and terms which are unique to this variable are also deleted.
         """
-        for x in ['domain','cell_methods']:
+        for x in ['spatial domain','cell_methods','time_domain']:
             y = getattr(self,x)
             if y.variable_set.count() == 1:
                 y.delete()
+
+        # Check for orphaned key_properties
+        for key_property in self.key_properties.all():
+        # If no other variable references this key_property, delete it
+            if key_property.variable_set.count() == 1:
+                key_property.delete()
+
     def delete(self,*args,**kwargs):
         self.predelete()
         super().delete(*args,**kwargs)
-
-
-
-
-class Var_Metadata(models.Model):
-    class Meta:
-        app_label = "db"
-
-    type = models.CharField(max_length=16)
-    collection_id = models.ForeignKey(Collection, on_delete=models.CASCADE)
-    json = models.BooleanField()
-    boolean_value = models.BooleanField()
-    char_value = models.TextField()
-    int_value = models.BigIntegerField()
-    real_value = models.FloatField()
-    key = models.CharField(max_length=128)
-
-
-
-
-class Directory(models.Model):
-    class Meta:
-        app_label = "db"
-    
-    id = models.AutoField(primary_key=True)
-    path = models.CharField(max_length=1024)
-    location = models.ManyToManyField(Location)
-    CFA = models.BooleanField()

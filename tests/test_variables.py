@@ -16,6 +16,11 @@ CELL_TEST_DATA = [
 
 STD_DOMAIN_PROPERTIES = {'name':'N216','region':'global','nominal_resolution':'10km',
                             'size':1000,'coordinates':'longitude,latitude,pressure'}
+STD_TEMPORAL = {'interval':30,'starting':15.,'ending':345, 
+                'units':'days since 2018-12-30','calendar':'360_day'}
+DAILY_TEMPORAL =  {'interval':1,'starting':1.,'ending':30., 
+                'units':'days since 2018-12-30','calendar':'360_day'}
+
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_db(tmp_path_factory, request):
@@ -33,92 +38,122 @@ def setup_test_db(tmp_path_factory, request):
     connection.close()  # Properly close the connection to the database
 
 @pytest.fixture(scope="module")
-def test_db():
+def test_data():
     """ 
     This database (and it's contents) is used in all the following
     tests, and is progressively modified as the tests proceed.
     """
     from core.db.interface import CollectionDB
-    return CollectionDB()
+    cdb = CollectionDB()
+    file_properties ={'name':'test_file_1','path':'/nowhere/','size':10}
+    l = cdb.location_create('varloc')
+    c = cdb.collection_create('Holding')
+    f = cdb.upload_file_to_collection(l.name, c.name, file_properties)
+    return cdb, f, c
 
+def test_simple_variable(test_data):
+    test_db, f, c  = test_data
+    properties = {'identity':'test var 1','atomic_origin':'imaginary', 'in_file':f,
+                  'spatial_domain':STD_DOMAIN_PROPERTIES, 'time_domain':STD_TEMPORAL,}
+    var = test_db.variable_retrieve_or_make(properties)
+    assert var.get_kp('identity') == 'test var 1'
+    
 
-def test_simple_variable(test_db):
-    properties = {'identity':'test var 1','atomic_origin':'imaginary','temporal_resolution':'daily',
-                  'domain':STD_DOMAIN_PROPERTIES}
+def test_keys_with_same_value(test_data):
+    test_db, f, c  = test_data
+    properties = {'identity':'test var 2','standard_name':'test var 1','atomic_origin':'imaginary',
+                   'spatial_domain':STD_DOMAIN_PROPERTIES, 'in_file':f,'time_domain':STD_TEMPORAL}
     var = test_db.variable_retrieve_or_make(properties)
 
-def test_keys_with_same_value(test_db):
-    properties = {'identity':'test var 2','standard_name':'test var 1','atomic_origin':'imaginary','temporal_resolution':'daily',
-                  'domain':STD_DOMAIN_PROPERTIES}
-    var = test_db.variable_retrieve_or_make(properties)
 
-
-def test_sharing_domain(test_db):
-    properties = {'identity':'test var 3','atomic_origin':'imaginary','temporal_resolution':'monthly',
-                  'domain':STD_DOMAIN_PROPERTIES}
+def test_sharing_domain(test_data):
+    test_db, f, c  = test_data
+    properties = {'identity':'test var 3','atomic_origin':'imaginary','in_file':f,
+                  'spatial_domain':STD_DOMAIN_PROPERTIES,'time_domain':DAILY_TEMPORAL}
     var = test_db.variable_retrieve_or_make(properties)
     assert len(test_db.domains_all()) == 1
     assert len(test_db.variables_all()) == 3
 
-def test_not_sharing_domain(test_db):
+def test_not_sharing_domain(test_data):
+    test_db, f, c  = test_data
     domain_properties = {'name':'N216','region':'global','nominal_resolution':'10km',
                             'size':1000,'coordinates':'longitude,latitude,levels'}
-    properties = {'identity':'test var 4','atomic_origin':'imaginary','temporal_resolution':'monthly',
-                  'domain':domain_properties}
+    properties = {'identity':'test var 4','atomic_origin':'imaginary','in_file':f,
+                  'spatial_domain':domain_properties,'time_domain':STD_TEMPORAL}
     var = test_db.variable_retrieve_or_make(properties)
     assert len(test_db.domains_all()) == 2
     assert len(test_db.variables_all()) == 4
 
-def test_creating_variable_with_properties(test_db):
-    properties = {'identity':'test var 5','atomic_origin':'imaginary','temporal_resolution':'daily',
-                  'domain': STD_DOMAIN_PROPERTIES,
-                  'experiment':'mytest','institution':'Narnia'}
+def test_creating_variable_with_properties(test_data):
+    test_db, f, c  = test_data
+    properties = {'identity':'test var 5','atomic_origin':'imaginary',
+                  'spatial_domain': STD_DOMAIN_PROPERTIES, 'time_domain':DAILY_TEMPORAL,
+                  'experiment':'mytest','institution':'Narnia','in_file':f}
     var = test_db.variable_retrieve_or_make(properties)
     assert len(test_db.variables_all()) == 5
 
-def test_retrieving_by_property_keys(test_db):
+def test_retrieving_by_property_keys(test_data):
+    test_db, f, c  = test_data
     variables = test_db.variables_retrieve_by_key('experiment','mytest')
     assert len(variables) == 1
 
-def test_cell_methods_create(test_db):
+def test_cell_methods_create(test_data):
     """ 
     Test creating a variable with cell methods in the properties 
     """
-    properties = {'identity':'test var 6','atomic_origin':'imaginary','temporal_resolution':'monthly',
-                  'domain':STD_DOMAIN_PROPERTIES,
-                  'cell_methods':CELL_TEST_DATA}
+    test_db, f, c  = test_data
+    properties = {'identity':'test var 6','atomic_origin':'imaginary',
+                  'spatial_domain':STD_DOMAIN_PROPERTIES,'time_domain':STD_TEMPORAL,
+                  'cell_methods':CELL_TEST_DATA, 'in_file':f}
     var = test_db.variable_retrieve_or_make(properties)
 
-def test_querying_cell_methods(test_db):
+def test_querying_cell_methods(test_data):
     """
-    Find all variables with a time: mean cell method and monthly data
+    Find all variables with a couple of combinations of cell methods
     """
+    test_db, f, c  = test_data
     # first create another one to create trouble 
-    props = {'temporal_resolution':'monthly', 'cell_methods':[('time','mean'),]}
-    var1 = test_db.variables_retrieve_by_properties(props)
-    var2 = test_db.variables_retrieve_by_properties({'identity':'test var 6'})
+    properties = {'identity':'test var 7','atomic_origin':'imaginary',
+                  'spatial_domain':STD_DOMAIN_PROPERTIES,'time_domain':STD_TEMPORAL,
+                  'cell_methods':[('time','mean'),], 'in_file':f}
+    var = test_db.variable_retrieve_or_make(properties)
+    vars = test_db.variables_all()
+    for v in vars:
+        print(v, v.cell_methods)
+    var1 = test_db.variables_retrieve_by_properties({'cell_methods':CELL_TEST_DATA})
     assert len(var1) == 1
+    var2 = test_db.variables_retrieve_by_properties({'identity':'test var 6'})
     assert var1[0] == var2[0]
+    vars = test_db.variables_retrieve_by_properties({'cell_methods':[('time','mean'),]})
+    assert len(vars) == 2
 
-def test_file_variable_collection(test_db):
+def test_more_queries(test_data):
     """
     Test adding a file and collection, then adding a variable into both,
     then retrieving the variable via it's presence in the file or collection. 
     """
-    file_properties ={'name':'test_file_1','path':'/nowhere/','size':10}
-    v = test_db.variables_retrieve_by_properties({'identity':'test var 6'})[0]
-    c = test_db.collection_create('Holding')
-    l = test_db.locations_retrieve()[0]
-    f = test_db.upload_file_to_collection(l.name, c.name, file_properties)
-  
-    test_db.variable_add_to_file_and_collection(v, f, c.name)
+    test_db, f, c  = test_data
+    vars = test_db.variables_retrieve_by_properties({'identity':'test var 1'})
+    assert len(vars) == 1,'Failed to recover the first variable identified by identity property'
+    v = vars[0]   
     var2 = test_db.variables_retrieve_by_properties({'in_file':f})    
-    assert var2[0] == v
+    assert var2[0] == v,'Failed to recover the first file created by file instance'
+    file_properties ={'name':'test_file_1','path':'/nowhere/','size':10}
     var2 =  test_db.variables_retrieve_by_properties({'in_file':file_properties})    
-    assert var2[0] == v
+    assert var2[0] == v,f'Failed to recover the first file created by properties'
+    
+
+def test_variables_and_collections(test_data):
+    test_db, f, c  = test_data
+    vars = test_db.variables_all()
+    # add the first three to collection
+    for v in vars[0:3]:
+         test_db.variable_add_to_collection(c.name, v)
     var2 = test_db.variables_retrieve_by_properties({},from_collection=c)
-    assert var2[0] == v
+    assert len(var2) == 3, f"Expected the 3 variables added here to be returned, got {len(var2)}"
     var2 = test_db.variables_retrieve_by_properties({'identity':'fred'}, from_collection=c)
-    assert len(var2) == 0
-    var2 = test_db.variables_retrieve_by_properties({'identity':'test var 6'}, from_collection=c)
-    assert var2[0] == v
+    assert len(var2) == 0,f'Expected to find no variables with identity fred, but got {len(var2)}'
+    var2 = test_db.variables_retrieve_by_properties({'identity':'test var 1'}, from_collection=c)
+    assert len(var2) == 1, f'Expected to recover just the one file from collection {c}'
+    assert var2[0] == vars[0],f'Expected to recover the first variable from collection {c}'
+  

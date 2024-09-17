@@ -12,7 +12,10 @@ def _dummy(db, location='testing', collection_stem="fdummy", files_per_collectio
     """ 
     Set up a dummy dataset in db with accessible structure for testing
     """
-    db.location_create(location)
+    try:
+        db.location_create(location)
+    except PermissionError:
+        pass
     for i in range(5):
         c = f'{collection_stem}{i}'
         db.collection_create(c, 'no description', {})
@@ -146,6 +149,7 @@ def test_add_relationships(test_db):
     """
     test_db.relationships_add('dummy1', 'dummy3', 'parent_of', 'child_of')
     x = test_db.relationships_retrieve('dummy1', 'parent_of')
+
     assert [('dummy1','dummy3'),('dummy1','dummy3')] == [(j.subject.name,j.related_to.name) for j in x]
     x = test_db.relationships_retrieve('dummy3', 'child_of')
     assert ['dummy3'] == [j.subject.name for j in x]
@@ -244,29 +248,6 @@ def test_locations(test_db):
     # we set all our dummy files up with 10
     l = test_db.location_retrieve(loc)
     assert l.volume == len(files)*10
-
-def test_new_location(test_db):
-    """ Test adding a new location with two protocols"""
-    protocols = ['posix','s3']
-    newloc = 'New-Location'
-    test_db.location_create(newloc,protocols=protocols)
-    loc = test_db.location_retrieve(newloc)
-    rp = loc.protocolset
-    assert protocols == [p.name for p in rp]
-
-def test_new_protocol(test_db):
-    """ 
-    Test adding a new protocol against a new location and an existing location 
-    """
-    locations = test_db.locations_retrieve()
-    eloc = locations[0].name
-    newloc = 'New-Location'
-    newp = 'magic'
-    test_db.protocol_add(newp, locations=[eloc,newloc])
-    for loc in [newloc, eloc]:
-        dloc = test_db.location_retrieve(loc)
-        locp = [p.name for p in dloc.protocolset]
-        assert newp in locp
 
 
 def NOtest_handle_upload_duplicates():
