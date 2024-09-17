@@ -14,7 +14,7 @@ CELL_TEST_DATA = [
      ('time', 'mean')
 ]
 
-STD_DOMAIN_PROPERTIES = {'name':'N216','region':'global','nominal_resolution':'10km',
+STD_DOMAIN_PROPERTIES = {'name':'TestDomain','region':'global','nominal_resolution':'10km',
                             'size':1000,'coordinates':'longitude,latitude,pressure'}
 STD_TEMPORAL = {'interval':30,'starting':15.,'ending':345, 
                 'units':'days since 2018-12-30','calendar':'360_day'}
@@ -76,7 +76,7 @@ def test_sharing_domain(test_data):
 
 def test_not_sharing_domain(test_data):
     test_db, f, c  = test_data
-    domain_properties = {'name':'N216','region':'global','nominal_resolution':'10km',
+    domain_properties = {'name':'AnotherDomain','region':'global','nominal_resolution':'10km',
                             'size':1000,'coordinates':'longitude,latitude,levels'}
     properties = {'identity':'test var 4','atomic_origin':'imaginary','in_file':f,
                   'spatial_domain':domain_properties,'time_domain':STD_TEMPORAL}
@@ -118,8 +118,6 @@ def test_querying_cell_methods(test_data):
                   'cell_methods':[('time','mean'),], 'in_file':f}
     var = test_db.variable_retrieve_or_make(properties)
     vars = test_db.variables_all()
-    for v in vars:
-        print(v, v.cell_methods)
     var1 = test_db.variables_retrieve_by_properties({'cell_methods':CELL_TEST_DATA})
     assert len(var1) == 1
     var2 = test_db.variables_retrieve_by_properties({'identity':'test var 6'})
@@ -156,4 +154,18 @@ def test_variables_and_collections(test_data):
     var2 = test_db.variables_retrieve_by_properties({'identity':'test var 1'}, from_collection=c)
     assert len(var2) == 1, f'Expected to recover just the one file from collection {c}'
     assert var2[0] == vars[0],f'Expected to recover the first variable from collection {c}'
-  
+
+def test_deletion(test_data):
+
+    test_db, f, c  = test_data
+    spatial = test_db.domain_retrieve_by_name('AnotherDomain')
+    vars = test_db.variables_retrieve_by_queries([('spatial_domain',spatial),])
+    to_die = []
+    count = len(vars)
+    for v in vars:
+        to_die.append(v.get_kp('identity'))
+        v.delete()
+    spatial = test_db.domain_retrieve_by_name('AnotherDomain')
+    assert spatial is None, 'Failed to delete spatial domain as variable was deleted'
+
+    

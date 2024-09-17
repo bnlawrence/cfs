@@ -18,13 +18,14 @@ def cfupload_variables(db, file, collection, extra_collections, cfa=False):
     fields = cf.read(file.path)
     descriptions = parse_fields_todict(fields, cfa=cfa)
     for d in descriptions:
+        d['in_file'] = file
         if 'cfa' in d:
             cfa = d.pop('cfa')
         v = db.variable_retrieve_or_make(d)
         if cfa:
             cfa['cfa_file']=file
             db.variable_add_fragments(v, cfa)
-        db.variable_add_to_file_and_collection(v, file, collection)
+        db.variable_add_to_collection(collection, v)
         for c in extra_collections:
              db.variable_add_to_collection(c, v)
     t2 = time()-t1

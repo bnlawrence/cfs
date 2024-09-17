@@ -31,6 +31,7 @@ class Domain(models.Model):
     class Meta:
         app_label="db"
     id = models.AutoField(primary_key=True)
+    # we can't make name unique ... 
     name = models.CharField(max_length=64)
     region = models.CharField(max_length=20)
     nominal_resolution = models.CharField(max_length=12)
@@ -44,12 +45,20 @@ class Domain(models.Model):
     def __str__(self):
         return f'{self.name}({self.nominal_resolution})'
     
+    def dump(self):
+        s = f'{self} - {self.region} ({self.size})\n{self.coordinates}'
+        if self.bbox_tl is not None:
+            s+= '\n'+','.join([self.bbox_bl,self.bbox_br,self.bbox_tl,self.bbox_tr])
+        return s+'\n'
+
+    
 class TimeDomain(models.Model):
 
     class Meta:
         app_label="db"
 
     interval =  models.IntegerField()
+    interval_units = models.CharField(max_length=3,default='d')
     units = models.CharField(max_length=12,default='days')
     calendar = models.CharField(max_length=12, default="standard")
     starting = models.FloatField()
@@ -144,11 +153,12 @@ class File(models.Model):
         s += f'\n{self.path}'
         return s
     
-    def delete(self,*args,**kwargs):
+    def predelete(self):
         """ 
         When a file is deleted, we need to make sure that the volume associated with
         it is removed from any collections and locations. 
-        Variables will be automatically deleted because their ForeignKey cascade makes that happen.
+        We explicitly delete the variables because the sql delete cascade does not 
+        run the variable delete method, and we need that to happen,
         """
         for c in self.collection_set.all():
             c.volume -= self.size
@@ -157,6 +167,13 @@ class File(models.Model):
             l.volume -= self.size
             l.save()
         candidates = self.variable_set.all()
+        for v in candidates: 
+            v.delete()
+
+    def delete(self,*args,**kwargs):
+        self.predelete()
+        super().delete(*args,**kwargs)
+
 
 
 class Tag(models.Model):
@@ -263,9 +280,14 @@ class Collection(models.Model):
                     raise PermissionError(
                         f'Cannot empty {self.name} (contains {n_unique} non-unique files)')
                 else:
-                    unique_files.delete()
+                    # avoid having go do a pre delete hook, since queryset
+                    # deletes do not run instnace delete methods 
+                    # unique_files.delete()
+                    for f in unique_files:
+                        f.delete()
             else:  # option 2
-                all_files.delete()
+                for f in all_files:
+                    f.delete()
         else:
             if unique_only: # option 3
                 if n_unique == 0:
@@ -487,8 +509,7 @@ class Variable(models.Model):
         # Ensure that key_properties contains the required 'identity'
         keys = [k.key for k in key_properties]
         if 'ID' not in keys:
-            print(key_properties)
-            raise ValueError("One of the key_properties must be 'identity'!")
+            raise ValueError("One of the key_properties ({key_properties}) must be 'identity'!")
 
         # Try to find an existing instance with the same non-ManyToMany fields
         existing_instance = cls.objects.filter(
@@ -526,10 +547,11 @@ class Variable(models.Model):
         When a variable is deleted, we need to make sure that any cell_methods, domains,
         and terms which are unique to this variable are also deleted.
         """
-        for x in ['spatial domain','cell_methods','time_domain']:
+        for x in ['spatial_domain','cell_methods','time_domain']:
             y = getattr(self,x)
-            if y.variable_set.count() == 1:
-                y.delete()
+            if y is not None:
+                if y.variable_set.count() == 1:
+                    y.delete()
 
         # Check for orphaned key_properties
         for key_property in self.key_properties.all():

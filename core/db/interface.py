@@ -310,6 +310,15 @@ class CollectionDB:
             raise ValueError('Multiple domains match your query')
         return d[0]
     
+    def domain_retrieve_by_name(self, name):
+        """ 
+        Retrieve spatial domain by name
+        """
+        try:
+            return Domain.objects.get(name=name)
+        except:
+            return None
+
     def domains_all(self):
         """ 
         Get all the domains
@@ -829,7 +838,7 @@ class CollectionDB:
             return results
         return results[0]
 
-    def variable_retrieve_by_queries(self, queries, from_collection=None):
+    def variables_retrieve_by_queries(self, queries, from_collection=None):
         """Retrieve variable by a list of common query types, limit queries to collection
         if wished.
         Each element of the list is a key,value pair
@@ -855,7 +864,7 @@ class CollectionDB:
            
         proxied = []
         for key,value in queries:
-            print('Query step', key, value)
+            #print('Query step', key, value)
             if key == 'key_properties':
                 base = base.filter(key_properties=value)
             elif key in ["spatial_domain","temporal_domain"]:
@@ -905,10 +914,8 @@ class CollectionDB:
         props = self._construct_properties(varprops)
         kp = [p.key for p in props['key_properties']]
         if 'ID' not in kp:
-            print('Failing id ', kp)
             raise ValueError('Variable definitions must include identity')
         if len(props)!= 6:
-            print(f'Var Failing {len(props)} ',props)
             raise ValueError('Insufficient properties to create a variable')
         args = [props[k] for k in ['_proxied','key_properties','spatial_domain',
                                    'time_domain','cell_methods','in_file']]
@@ -916,7 +923,7 @@ class CollectionDB:
         return var
 
     def variable_search(self, key, value):
-        return self.variable_retrieve_by_queries([(key,value),])
+        return self.variables_retrieve_by_queries([(key,value),])
     
     def variables_all(self):
         return Variable.objects.all()
@@ -930,7 +937,7 @@ class CollectionDB:
             var.delete()
 
     def variables_retrieve_by_key(self, key, value):
-        return self.variable_retrieve_by_queries([(key,value),])
+        return self.variables_retrieve_by_queries([(key,value),])
 
 
     def variables_retrieve_by_properties(self, properties, from_collection=None, unique=False):
@@ -962,7 +969,7 @@ class CollectionDB:
                     queries.append((k,vv))
             else:
                 queries.append((k,v))
-        results = self.variable_retrieve_by_queries(queries, from_collection=from_collection)
+        results = self.variables_retrieve_by_queries(queries, from_collection=from_collection)
         if unique:
             if len(results) > 1:
                 raise ValueError('Query retrieved multiple variables ({c}) - but uniqueness was requested')

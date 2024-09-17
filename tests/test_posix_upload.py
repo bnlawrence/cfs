@@ -67,7 +67,7 @@ def test_posix_class_basic(django_dependencies, posix_info):
         'collection of variables from the test data')
     c1 = test_db.collection_retrieve('posix_test_collection')
     assert c1.volume == sum(s)
-    assert set([x.standard_name.value for x in c1.variables.all()]) == set(VARIABLE_LIST)
+    assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
 
 
 def test_parents(django_dependencies, posix_nest):
@@ -97,7 +97,7 @@ def test_posix_class_nested(django_dependencies, posix_nest):
         'collection of variables from the test data',
         subcollections=True)
     c1 = test_db.collection_retrieve('posix_test_collection2')
-    assert set([x.standard_name.value for x in c1.variables.all()]) == set(VARIABLE_LIST)
+    assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
     assert c1.volume == sum(s)
     assert len(test_db.relationships_retrieve('posix_test_collection2','parent_of')) == 1
     c2 = test_db.collection_retrieve('posix_test_collection2/subset1')
@@ -108,8 +108,6 @@ def test_posix_class_nested(django_dependencies, posix_nest):
     rout = test_db.relationships_retrieve('posix_test_collection2').count()
     rin = test_db.relationships_retrieve('posix_test_collection2',outbound=False).count()
     assert rout+rin == 2
-
-
 
 def test_deleting_collections(django_dependencies):
     """
@@ -136,8 +134,12 @@ def test_cleanup(django_dependencies):
     # find all the files in those collections and make sure we delete those
     for collection in collections:
         test_db.collection_delete(collection.name, force=True)
-    for v in test_db.variables_all():
+    variables_left = test_db.variables_all()
+    for v in variables_left:
         assert v.in_files.count()!=0, f"Variable [{v}] should not exist if it is in NO files"
+    assert len(variables_left) == 0,'Variables have not been cleaned up'
+    d = test_db.domains_all()
+    assert len(d)==0,'Domains have not been cleaned up'
     
     
 

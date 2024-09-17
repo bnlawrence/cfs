@@ -8,6 +8,7 @@ import cf
 import numpy as np
 import pytest
 
+
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_db(tmp_path_factory, request):
     """ 
@@ -31,34 +32,33 @@ def test_db():
     from core.db.interface import CollectionDB
     return CollectionDB()
 
-
-
-def test_infer_timing(inputfield):
+def test_infer_timing():
 
     #FIXME:Horrible hack. Hourly unit tests fail if we start with cf.Data(15.,45.,75.5)
     #Why?Help?
-    tconstruct = inputfield.construct('T')
+    units = cf.Units('days since 2018-12-31')
     t2construct = cf.DimensionCoordinate(
                         properties={'standard_name': 'time',
-                        'units': cf.Units('days since 2018-12-31')},
-                        data = cf.Data([15.5,45.5,75.5]) )
-    inputfield.set_construct(t2construct)
-    print('bounds',inputfield.construct('T').has_bounds())
+                        'units': units},
+                        data = cf.Data([15.5,45.5,75.5],units=units) )
+ 
 
-    assert infer_temporal_resolution(inputfield) == '1m'
+    r = infer_temporal_resolution(t2construct) == (1,'m')
+    print(r)
+    assert r == 1,'m'
 
-    inputfield.construct('T')[...] = [0/24.,1./24,2./24]
-   
-    assert infer_temporal_resolution(inputfield) == '1h'
+    t2construct[...] = [0/24.,1./24,2./24]
+    r = infer_temporal_resolution(t2construct) == (1,'h')
+    assert r == 1,'h'
 
-    inputfield.construct('T')[...] = [0,3./24,6./24]
-    assert infer_temporal_resolution(inputfield) == '3h'
+    t2construct[...] = [0,3./24,6./24]
+    assert infer_temporal_resolution(t2construct) == (3,'h')
 
-    inputfield.construct('T')[...] = [45,135,225]
-    assert infer_temporal_resolution(inputfield) == '3m'
+    t2construct[...] = [45,135,225]
+    assert infer_temporal_resolution(t2construct) == (3,'m')
 
-    inputfield.construct('T')[...] = [0,360,720]
-    assert infer_temporal_resolution(inputfield) == '1y'
+    t2construct[...] = [0,360,720]
+    assert infer_temporal_resolution(t2construct) == (1,'y')
 
 def test_domain(inputfield):
     
@@ -75,21 +75,32 @@ def test_field_parsing(inputfield):
     adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_class=None)[0]
     assert adict['identity'] == 'specific_humidity'
     assert 'units' in adict['_proxied']
-    assert adict['time_domain']['interval'] == '1m'
+    assert adict['time_domain']['interval'] == 1
     assert adict['spatial_domain']['name'] == 'test'
     assert 'atomic_origin' in adict
 
 def test_upload_parsed_dict(inputfield, test_db):
     """ Can we sensibly upload a variable from this parsed dictionary?"""
+    file_properties ={'name':'test_file_1','path':'/nowhere/','size':10}
+    l = test_db.location_create('parloc')
+    c = test_db.collection_create('parcol')
+    f = test_db.upload_file_to_collection(l.name, c.name, file_properties)
     adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_class=None)[0]
+    adict['in_file'] = f
+    adict['identity'] = 'special test var'
     v0=test_db.variable_retrieve_or_make(adict)
     with pytest.raises(ValueError):
        # this should fail because we can't do a retrieve or make without enough info to do a make!
-       v1 = test_db.variable_retrieve_or_make({'identity':'specific_humidity'})
-    v1 = test_db.variables_retrieve_by_properties({'identity':'specific_humidity'})[0]
-    # I can't seem to get proper test isolation, so for now, let's just delete the things
-    # that intefere with other tests.
-    print('parsing deletion attempt')
+       v1 = test_db.variable_retrieve_or_make({'identity':'special test var'})
+    v1 = test_db.variables_retrieve_by_properties({'identity':'special test var'})[0]
+    # Tests are not necessarily isolated, so for now, let's just delete the things
+    # that intefere with other tests from other files.
+    
+    d1 = v1.spatial_domain.name
     v1.delete()
-
+    d2 = test_db.domain_retrieve_by_name(d1)
+    assert d2 is None, 'Variable delete failed to delete the spatial domain used for parsing'
+    d = test_db.domains_all()
+    assert len(d)==0,'parsing cleanup not complete'
   
+

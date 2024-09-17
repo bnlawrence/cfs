@@ -133,42 +133,48 @@ def extract_cfsdomain(field, lookup_class=Lookup):
     }
     return domain_properties
 
-def extract_cfstemporal(field, temporal_resolution):
-    """ Extract the information needed for a CFS temporal domain"""
+def extract_cfstemporal(field, temporal_resolution=None):
+    """ Extract the information needed for a CFS temporal domain.
+    : field : a normal CF field
+    : temporal_resolution : A tuple (interval, interval_units) (e.g 1,'mon')
+            which should be used for the time domain. If not provided,
+            it is inferred from the data
+    """    
     tdim = field.construct('T')
     if temporal_resolution is None:
-        temporal_resolution = infer_temporal_resolution(tdim)
+        interval, interval_units = infer_temporal_resolution(tdim)
+    else:
+        interval, interval_units = temporal_resolution
     data = field.construct('T').data
-    return {'interval':temporal_resolution, 'starting':float(data[0].array[0]),
+    return {'interval':interval, 'interval_units':interval_units,'starting':float(data[0].array[0]),
             'ending': float(data[-1].array[0]), 'units':tdim.units, 'calendar':tdim.calendar}
 
 
 def infer_temporal_resolution(tdim):
     """
-    Guess temporal resolution from cell spacing. 
+    Guess temporal resolution from cell spacing.
+    : tdim : a cf time dimension coordinate construct 
     Will likely need fixing when we confront it with real data from the wild. 
-    Thanks David!
+    Thanks in advance David!
     """
-    #try:
-    data = tdim.data
-    delta = (data[2]-data[0])/2
+    delta = (tdim[2].data-tdim[0].data)/2
     delta.Units = cf.Units('day')
-    if delta < cf.D(1):   #hours
+    if delta < cf.TimeDuration(1,'day'):   #hours
         delta.Units = cf.Units('hour')
-        return f'{int(delta)}h'
-    elif delta < cf.D(28): 
-        return f'{int(delta)}d'
-    elif delta < cf.D(31):
-        return f'1m'
-    elif delta> cf.D(89) and delta < cf.D(93):
-        return '3m'
-    elif delta> cf.D(359) and delta < cf.D(367): 
-        return '1y'
+        return int(delta),'h'
+    elif delta < cf.TimeDuration(28,'day'): 
+        return int(delta),'d'
+    elif delta < cf.TimeDuration(31,'day'):
+        return 1,'m'
+    elif delta> cf.TimeDuration(89,'day') and delta < cf.TimeDuration(93,'day'):
+        return 3,'m'
+    elif delta> cf.TimeDuration(359,'day') and delta < cf.TimeDuration(367,'day'): 
+        return 1,'y'
     else:
         if tdim.calendar == '360_day':
-            return f'{int(delta/360)}y'
+            return int(delta/360),'y'
         else:
-            return f'{int(delta/360.25)}y'
+            return int(delta/360.25),'y'
 
 
 def parse_fields_todict(fields, temporal_resolution=None, lookup_class=None, cfa=False):
