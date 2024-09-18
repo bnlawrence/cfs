@@ -226,6 +226,28 @@ class CollectionDB:
                     col.files.add(newfile)
                     newfile.save()
 
+    def collection_type_add(self, collection, key, value):
+        """ 
+        Add a particular collection property to the collection.
+        These key,value pairs should only be used when they 
+        are likely to be imoportant terms for searching across
+        collections
+        : collection : name or instance
+        : key : key to add 
+        : value : key to use 
+        """
+        if not isinstance(collection,Collection):
+            collection=self.collection_retrieve(collection)
+        if key == '_type':
+            try:
+                value = FileType.get_value(value)
+            except KeyError:
+                raise ValueError('The special collection key _type must have value which is a FileType key')
+        term, created = CollectionType.objects.get_or_create(key=key,value=value)
+        if created:
+            term.save()
+        collection.type.add(term)
+
     def collection_retrieve(
         self, collection_name):
         """
@@ -338,7 +360,7 @@ class CollectionDB:
         """
         f = file_instance
         c = Collection.objects.get(name=collection_name)
-        if c.files.filter(name=f.name).exists():
+        if c.files.filter(path=f.name).exists():
             raise PermissionError(
                 f"Attempt to add file {f.name} to {c.name} - but it's already there")
         c.files.add(f)
@@ -412,6 +434,11 @@ class CollectionDB:
         if queryset.model != File:
             raise PermissionError(f'Attempt to delete a queryset of{queryset.model} with files_delete')
         queryset.delete()
+    
+    def files_retrieve_by_type(self,type):
+        if type not in FileType:
+            raise ValueError(f'Cannot query files by invalid type {type}')
+        return File.objects.filter(type=type).all()
     
     def files_retrieve_from_variables(self, variables):
         files = File.objects.filter(variable__in=variables)
@@ -546,6 +573,7 @@ class CollectionDB:
         """
         Add a CFA manifest
         This should always be unique.
+        Can be deleted by deleting the parent file.
         """
         if 'cells' in properties:
             cells = properties.pop('cells')
@@ -554,6 +582,9 @@ class CollectionDB:
         # parse fragment file dictionaries into proper files
         fragments = properties.pop('fragments')
         with transaction.atomic():
+            # we do this directly for efficiency, and to bypass
+            # the interface file check on size, which we may not know
+            # for fragment files.
             m = Manifest.objects.create(**properties)
             file_objects = [File(**f) for f in fragments]
             File.objects.bulk_create(file_objects)

@@ -76,7 +76,8 @@ def test_cfa_view(django_dependencies, cfa_resources):
         str(posix_path),
         'posix_cfa_example',
         'one aggregated variable',
-        regex='*.cfa'
+        regex='*.cfa',
+        intent='C'
         )
     c1 = test_db.collection_retrieve('posix_cfa_example')
     assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
@@ -84,24 +85,24 @@ def test_cfa_view(django_dependencies, cfa_resources):
 
 def test_fragments(django_dependencies):
     """ 
-    when we added the cfa file we should have added
-    some fragments, let's look at them
+    When we added the cfa file we should have added
+    some fragments, let's look at them. Assumptions
+    are that the fragments should not appear in 
+    collections, but the cfa file should.
     """
     test_db, ignore, ignore = django_dependencies
     files = test_db.files_retrieve_in_collection('posix_cfa_example')
     from core.db.models import File
     files2 = File.objects.all()
-    print(f'{files2.count()} files found')
-    for f in files2:
-        print(f) 
-    for f in files:
-        print(f)
-
-def test_fragment_deletion_with_variables(django_dependencies):
-    """ need to make sure fragment and aggregation descriptins are deleted
-    with their CFFA files and/or variables. 
-    """
-    raise NotImplementedError
+    # we should see four files in the system: the CFA file and three fragments
+    try:
+        assert files2.count() == 4
+    except:
+        print([(f.name, f.format) for f in files2])
+        raise
+    assert len(files) == 1
+    assert files[0].format == '.cfa'
+    assert files[0].type == 'C'
 
 def test_cfa_cleanup(django_dependencies):
     """ 
@@ -111,11 +112,15 @@ def test_cfa_cleanup(django_dependencies):
     test_db, ignore , ignore = django_dependencies
     collections = test_db.collections_retrieve(name_contains='posix')
     assert collections.count() == 1, "Failed to find correct number of posix collections"
+    frags = test_db.files_retrieve_by_type('F')
+    assert frags.count() == 3
     # find all the files in those collections and make sure we delete those
     for collection in collections:
         test_db.collection_delete(collection.name, force=True)
     for v in test_db.variables_all():
         assert v.in_files.count()!=0, f"Variable [{v}] should not exist if it is in NO files"
     test_db.location_delete('vftesting')
-    # Eventually we need to check we empty the fragment files too.
+    # need to check we empty the fragment files too.
+    frags = test_db.files_retrieve_by_type('F')
+    assert frags.count() == 0
 

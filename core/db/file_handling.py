@@ -32,11 +32,23 @@ def cfupload_variables(db, file, collection, extra_collections, cfa=False):
     return f'cfupload_file: {len(descriptions)} uploaded in {t2:.2f}s',len(descriptions),t2
 
 
-def cfupload_ncfiles(db, location_name, base_collection, dbfiles, cfa=False):
+def cfupload_ncfiles(db, location_name, base_collection, dbfiles,intent,  cfa=False, accessor=None):
     """ 
     Upload the cf information held in a bunch of files described by "normal file dictionaries"
     with a list of extra target collections embedded in each.
+    : location_name : storage location name
+    : base_collection : this will be a collection name used for _this_ set of file uploads.
+    : dbfiles : a list of file details
+    : intent : the collection intent, which will correspond to the filetype
+    : cfa : if the list of files is a list of CFA files
+    : accessor : optional class for handling inspection of CFA fragments 
+                (What, if anything can be done with the fragment file details will depend
+                on the capability provided by this class. If None, then only the 
+                path informaiton is used.)
+
     """
+    if intent == 'F':
+        raise ValueError('Intent cannot be to be a fragment')
     msgs = []
     t = 0
     nv = 0
@@ -47,6 +59,7 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, cfa=False):
             collections = fd.pop('collections')
         except KeyError:
             collections = []
+        fd['type']=intent
         file = db.upload_file_to_collection(location_name, base_collection.name, fd, lazy=1, update=False)
         m, n, t = cfupload_variables(db, file, base_collection.name, collections, cfa=cfa)
         msgs.append(m)

@@ -3,7 +3,7 @@ from django.db.models import Q, Count,OuterRef, Subquery, UniqueConstraint
 from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_delete, m2m_changed, post_delete
 import hashlib
-import enum
+from pathlib import Path
 
 from django.dispatch import receiver
 
@@ -96,6 +96,18 @@ class FileType(models.TextChoices):
     STYPE = 'S', "Standalone File"
     FTYPE = 'F', "Fragment File"
 
+    @classmethod
+    def get_value(cls, key):
+        """ Return the display value for the input key """
+        for choice_key, choice_value in cls.choices:
+            if choice_key == key:
+                return choice_value
+        raise ValueError(f"Invalid key: {key}")
+
+    def mykey(self,myvalue):
+        reversed = {v:k for k,v in self.choices}
+        return reversed[myvalue]
+
 class File(models.Model):
     """
     Files are the physical manifestation that we have to manage, so
@@ -122,7 +134,7 @@ class File(models.Model):
     id = models.AutoField(primary_key=True)
     
     # mandatory properties
-    name = models.CharField(max_length=256)
+    name = models.CharField(max_length=128)
     path = models.CharField(max_length=256)
     size = models.PositiveIntegerField(null=True)
     type = models.CharField(max_length=1,choices=FileType)
@@ -171,6 +183,10 @@ class File(models.Model):
         candidates = self.variable_set.all()
         for v in candidates: 
             v.delete()
+        #manifest attribute only exists on instances that are in manifests
+        if hasattr(self,'manifest'):
+            for f in self.manifest.fragments.all():
+                f.delete()
 
     def delete(self,*args,**kwargs):
         self.predelete()
