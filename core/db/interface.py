@@ -1,10 +1,11 @@
 import os
 
 from django import template
+from django.db import transaction
 from django.db.models import Q, Count,OuterRef, Subquery
 
 from core.db.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
-                            Domain, File, FileType, Location, 
+                            Domain, File, FileType, Location, Manifest,  
                             VariableProperty, VariablePropertyKeys,
                             Relationship, Tag, TimeDomain, Variable)
 
@@ -325,27 +326,6 @@ class CollectionDB:
         """
         return Domain.objects.all()
     
-    
-    def directories_retrieve(self):
-        """
-        Retrieve directories locations.
-        """
-        #def retrieve_directories(self):
-        dir = Directory.objects.all()
-        return dir
-
-    def directory_make(self, path, location, cfa):
-        cfa = Directory.objects.create(path=path, location=location,CFA=cfa)
-        cfa.save()
-        return cfa
-
-    def directory_retrieve_cfa(self):
-        """
-        Retrieve directories locations.
-        """
-        cfa = Directory.objects.filter(cfa=True)
-        return cfa
-
 
     def file_add_to_collection(self,
                                collection_name,
@@ -561,6 +541,24 @@ class CollectionDB:
         locs = Location.objects.all()
         return locs
 
+
+    def manifest_add(self, properties):
+        """
+        Add a CFA manifest
+        This should always be unique.
+        """
+        if 'cells' in properties:
+            cells = properties.pop('cells')
+            print(cells)
+            print('Removed cells from manifest, why did we want them?')
+        # parse fragment file dictionaries into proper files
+        fragments = properties.pop('fragments')
+        with transaction.atomic():
+            m = Manifest.objects.create(**properties)
+            file_objects = [File(**f) for f in fragments]
+            File.objects.bulk_create(file_objects)
+            m.fragments.add(*file_objects)
+            # no saves needed, all done by the transaction
 
     def organise(self, collection, files, description):
         """
@@ -798,22 +796,6 @@ class CollectionDB:
         c.save()
         loc.save()
         return results
-
-    def variable_add_fragments(self, variable, props):
-        """
-        As we add variables, we can find CFA fragments, each of
-        which had better be new for now!
-        """
-        #Currently expecting fproperties
-        #FIXME: Lots to do with base locations for CFA files
-        keys = ['units','calendar','bounds','cfa_file']
-        a = Aggregation(**{k:props[k] for k in keys})
-        a.save()
-        for p, n in zip(props['filenames'],props['cells']):
-            size = n*variable.spatial_domain.size
-            f = File(name=p,size=size)
-            f.part_of.add(a)
-            f.save()    
 
     def variable_add_to_collection(self, collection, variable):
         """

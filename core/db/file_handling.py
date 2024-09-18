@@ -22,12 +22,12 @@ def cfupload_variables(db, file, collection, extra_collections, cfa=False):
         if 'cfa' in d:
             cfa = d.pop('cfa')
         v = db.variable_retrieve_or_make(d)
-        if cfa:
-            cfa['cfa_file']=file
-            db.variable_add_fragments(v, cfa)
         db.variable_add_to_collection(collection, v)
         for c in extra_collections:
              db.variable_add_to_collection(c, v)
+        if cfa:
+            cfa['cfa_file'] = file
+            db.manifest_add(cfa)
     t2 = time()-t1
     return f'cfupload_file: {len(descriptions)} uploaded in {t2:.2f}s',len(descriptions),t2
 

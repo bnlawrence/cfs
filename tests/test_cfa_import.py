@@ -79,7 +79,7 @@ def test_cfa_view(django_dependencies, cfa_resources):
         regex='*.cfa'
         )
     c1 = test_db.collection_retrieve('posix_cfa_example')
-    assert set([x.standard_name.value for x in c1.variables.all()]) == set(VARIABLE_LIST)
+    assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
 
 
 def test_fragments(django_dependencies):

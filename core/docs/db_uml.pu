@@ -5,7 +5,7 @@ class db.Domain #e4f4d6 {
     + name (CharField)
     + region (CharField)
     + nominal_resolution (CharField)
-    + size (IntegerField)
+    + size (PositiveIntegerField)
     + coordinates (CharField)
     + bbox_tl (FloatField)
     + bbox_tr (FloatField)
@@ -16,7 +16,8 @@ class db.Domain #e4f4d6 {
 
 class db.TimeDomain #e4f4d6 {
     + id (BigAutoField)
-    + interval (IntegerField)
+    + interval (PositiveIntegerField)
+    + interval_units (CharField)
     + units (CharField)
     + calendar (CharField)
     + starting (FloatField)
@@ -27,7 +28,7 @@ class db.TimeDomain #e4f4d6 {
 class db.Location #e4f4d6 {
     - id (AutoField)
     + name (CharField)
-    + volume (IntegerField)
+    + volume (PositiveBigIntegerField)
 }
 
 
@@ -35,18 +36,29 @@ class db.File #e4f4d6 {
     - id (AutoField)
     + name (CharField)
     + path (CharField)
-    + size (IntegerField)
+    + size (PositiveIntegerField)
     + type (CharField)
     + checksum (CharField)
     + checksum_method (CharField)
     + uuid (UUIDField)
     + format (CharField)
-    ~ cfa_file (ForeignKey)
     # locations (ManyToManyField)
 }
-db.File o--> db.File
 db.File o--o db.Location
 db.File .- db.File_type
+
+
+class db.Manifest #e4f4d6 {
+    - id (AutoField)
+    ~ cfa_file (OneToOneField)
+    + bounds (BinaryField)
+    + units (CharField)
+    + calendar (CharField)
+    + total_size (PositiveBigIntegerField)
+    # fragments (ManyToManyField)
+}
+db.Manifest <--* db.File
+db.Manifest o--o db.File
 
 
 class db.Tag #e4f4d6 {
@@ -65,7 +77,7 @@ class db.CollectionType #e4f4d6 {
 class db.Collection #e4f4d6 {
     + _proxied (JSONField)
     + name (CharField)
-    + volume (IntegerField)
+    + volume (PositiveBigIntegerField)
     + description (TextField)
     - id (AutoField)
     + batch (BooleanField)
@@ -130,6 +142,7 @@ db.Variable o--o db.VariableProperty
 
 
 enum db.File_type{
+    + C - ('C', 'CFA File')
     + A - ('A', 'CFA File holds atomic dataset(s)')
     + Q - ('Q', 'CFA File holds quark(s)')
     + S - ('S', 'Standalone File')

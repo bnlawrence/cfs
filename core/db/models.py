@@ -35,7 +35,7 @@ class Domain(models.Model):
     name = models.CharField(max_length=64)
     region = models.CharField(max_length=20)
     nominal_resolution = models.CharField(max_length=12)
-    size = models.IntegerField()
+    size = models.PositiveIntegerField()
     coordinates = models.CharField(max_length=256)
     bbox_tl = models.FloatField(null=True)
     bbox_tr = models.FloatField(null=True)
@@ -57,7 +57,7 @@ class TimeDomain(models.Model):
     class Meta:
         app_label="db"
 
-    interval =  models.IntegerField()
+    interval =  models.PositiveIntegerField()
     interval_units = models.CharField(max_length=3,default='d')
     units = models.CharField(max_length=12,default='days')
     calendar = models.CharField(max_length=12, default="standard")
@@ -77,7 +77,7 @@ class Location(models.Model):
 
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=256)
-    volume = models.IntegerField()
+    volume = models.PositiveBigIntegerField()
     
     def __str__(self):
         return f'{self.name} ({sizeof_fmt(self.volume)})'
@@ -85,10 +85,12 @@ class Location(models.Model):
 class FileType(models.TextChoices):
     """ 
     Types of file recognised:
+     - Generic CFA files.
      - CFA Atomic Dataseet files, CFA Quark Files
      - Standalone Files, Fragment Files
     """
 
+    CTYPE = 'C', "CFA File"
     ATYPE = 'A', "CFA File holds atomic dataset(s)"
     QTYPE = 'Q', "CFA File holds quark(s)"
     STYPE = 'S', "Standalone File"
@@ -122,21 +124,21 @@ class File(models.Model):
     # mandatory properties
     name = models.CharField(max_length=256)
     path = models.CharField(max_length=256)
-    size = models.IntegerField()
+    size = models.PositiveIntegerField(null=True)
     type = models.CharField(max_length=1,choices=FileType)
     # mandatory for our logic, not for django:
     locations = models.ManyToManyField("Location")
 
     #optional properties:
-    checksum = models.CharField(max_length=1024, null=True)
-    checksum_method = models.CharField(max_length=256,null=True)
+    checksum = models.CharField(max_length=64, null=True)
+    checksum_method = models.CharField(max_length=8,null=True)
     uuid = models.UUIDField(null=True)
-    format = models.CharField(max_length=256, null=True)
-    cfa_file = models.ForeignKey(
-        'self', on_delete=models.SET_NULL,
-        related_name='fragments',
-        null=True
-    )
+    format = models.CharField(max_length=3, null=True)
+    #cfa_file = models.ForeignKey(
+    #    'self', on_delete=models.SET_NULL,
+    #    related_name='fragments',
+    #    null=True
+    #)
 
     def __str__(self):
         """ 
@@ -175,6 +177,19 @@ class File(models.Model):
         super().delete(*args,**kwargs)
 
 
+class Manifest(models.Model):
+    """
+    Carrys information about the set of fragments sufficient to be able to temporally subset 
+    based on the time bounds associated with each fragment.
+    """
+
+    id = models.AutoField(primary_key=True)
+    cfa_file = models.OneToOneField(File, on_delete=models.CASCADE, related_name="manifest")
+    fragments = models.ManyToManyField(File,related_name='fragment_set')
+    bounds = models.BinaryField()
+    units = models.CharField(max_length=20)
+    calendar = models.CharField(max_length=20)
+    total_size = models.PositiveBigIntegerField(null=True)
 
 class Tag(models.Model):
     class Meta:
@@ -223,7 +238,7 @@ class Collection(models.Model):
 
     _proxied = models.JSONField()
     name = models.CharField(max_length=256, unique=True)
-    volume = models.IntegerField()
+    volume = models.PositiveBigIntegerField()
     description = models.TextField()
     id = models.AutoField(primary_key=True)
     batch = models.BooleanField()
