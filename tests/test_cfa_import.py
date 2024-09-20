@@ -4,6 +4,8 @@ from pathlib import Path
 import numpy as np
 import os
 
+import logging
+
 from core.db.standalone import setup_django
 
 VARIABLE_LIST = ['specific_humidity',]
@@ -20,6 +22,16 @@ def setup_test_db(tmp_path_factory, request):
     dbfile = str(Path(tmp_path) / f'{module_name}.db')
     migrations_location = str(Path(tmp_path)/'migrations')
     setup_django(db_file=dbfile,  migrations_location=migrations_location)
+    #from django.conf import settings
+
+    #logging.config.dictConfig(settings.LOGGING)
+
+    # Debug loggers and handlers
+    #for logger_name in sorted(logging.root.manager.loggerDict.keys()):
+    #    logger = logging.getLogger(logger_name)
+    #    print(f"Logger: {logger_name}, Level: {logger.level}, Handlers: {logger.handlers}")
+    
+    
     yield # This marks the end of the setup phase and begins the test execution
 
 
@@ -28,6 +40,7 @@ def cfa_resources(tmp_path, inputfield):
     """
     Make three copies of our basic netcdf file, and then aggregate it
     """
+
     posix_path = tmp_path / 'posix_root'  
     posix_path.mkdir(exist_ok=True)  
     
@@ -61,6 +74,7 @@ def cfa_resources(tmp_path, inputfield):
     #FIXME: I don't think the substitutions are being parsed properly.
     cf.write(f, cfa_file, cfa={'absolute_paths':False,
                                'substitutions':{'base':'./'}})
+    print('CFA setup with three files and one field')
 
     return posix_path
 
@@ -69,9 +83,10 @@ def test_cfa_view(django_dependencies, cfa_resources):
     Test uploading a cfa file as normal nc file
     """
     #for f in cfa_resources.glob('*.cfa'):
-    #    os.system(f'ncdump {f}')
+    #    os.system(f'ncdump {f}')  
     posix_path = cfa_resources
     test_db, p, ignore = django_dependencies
+
     p.add_collection(
         str(posix_path),
         'posix_cfa_example',

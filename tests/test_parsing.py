@@ -1,4 +1,4 @@
-from core.db.cfparsing import infer_temporal_resolution, extract_cfsdomain
+from core.db.cfparsing import LookupT, extract_cfsdomain
 from core.db.cfparsing import parse_fields_todict, parse2atomic_name
 from core.db.standalone import setup_django
 from django.db import connection
@@ -42,26 +42,29 @@ def test_infer_timing():
                         'units': units},
                         data = cf.Data([15.5,45.5,75.5],units=units) )
  
+    lookup = LookupT()
 
-    r = infer_temporal_resolution(t2construct) == (1,'m')
+    
+    r = lookup.infer_interval_from_coord(t2construct) == (1,'m')
     print(r)
     assert r == 1,'m'
 
     t2construct[...] = [0/24.,1./24,2./24]
-    r = infer_temporal_resolution(t2construct) == (1,'h')
+    r = lookup.infer_interval_from_coord(t2construct) == (1,'h')
     assert r == 1,'h'
 
     t2construct[...] = [0,3./24,6./24]
-    assert infer_temporal_resolution(t2construct) == (3,'h')
+    assert lookup.infer_interval_from_coord(t2construct) == (3,'h')
 
     t2construct[...] = [45,135,225]
-    assert infer_temporal_resolution(t2construct) == (3,'m')
+    assert lookup.infer_interval_from_coord(t2construct) == (3,'m')
 
     t2construct[...] = [0,360,720]
-    assert infer_temporal_resolution(t2construct) == (1,'y')
+    assert lookup.infer_interval_from_coord(t2construct) == (1,'y')
 
 def test_domain(inputfield):
     
+    print(inputfield)
     d = extract_cfsdomain(inputfield)
     assert d['name'] == 'test'
 
@@ -72,7 +75,7 @@ def test_atomic_name(inputfield):
 
 def test_field_parsing(inputfield):
 
-    adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_class=None)[0]
+    adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_xy=None)[0]
     assert adict['identity'] == 'specific_humidity'
     assert 'units' in adict['_proxied']
     assert adict['time_domain']['interval'] == 1
@@ -85,7 +88,7 @@ def test_upload_parsed_dict(inputfield, test_db):
     l = test_db.location_create('parloc')
     c = test_db.collection_create('parcol')
     f = test_db.upload_file_to_collection(l.name, c.name, file_properties)
-    adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_class=None)[0]
+    adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_xy=None)[0]
     adict['in_file'] = f
     adict['identity'] = 'special test var'
     v0=test_db.variable_retrieve_or_make(adict)

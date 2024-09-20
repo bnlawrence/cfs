@@ -11,8 +11,12 @@ from core.db.models import (Cell_MethodSet, Cell_Method, Collection, CollectionT
 
 from tqdm import tqdm
 
+import logging
+logger = logging.getLogger(__name__)
+
 register = template.Library()
 @register.filter
+
 
 def get_obj_field(obj, key):
     return obj[key]
@@ -577,10 +581,10 @@ class CollectionDB:
         """
         if 'cells' in properties:
             cells = properties.pop('cells')
-            print(cells)
-            print('Removed cells from manifest, why did we want them?')
+            logger.info(f'Removed cells {cells} from manifest, why did we want them?')
         # parse fragment file dictionaries into proper files
         fragments = properties.pop('fragments')
+        print("manifest properties", properties)
         with transaction.atomic():
             # we do this directly for efficiency, and to bypass
             # the interface file check on size, which we may not know

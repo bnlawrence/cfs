@@ -6,6 +6,53 @@ from django.core.management import execute_from_command_line
 import sys
 import warnings
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s - %(message)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        '': {  # This is the root logger
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'core': {
+            'handlers': ['console'],
+            'level': 'DEBUG',  # Set the level you want for 'core' and its submodules
+            'propagate': True,  # Allow messages to propagate to the root logger
+        },
+
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    }
+}
+
+def set_logging_level(leveldict={}):
+    """ modify the logging level in all the loggers"""
+    logsettings = LOGGING
+    for logger, setting in leveldict:
+        logsettings['loggers'][logger]['level'] = setting
+    return logsettings
+        
+
+
+
 def check_and_create_database():
     """ 
     This checks to see if the database file exists, and if it includes at least one of 
@@ -16,6 +63,7 @@ def check_and_create_database():
     #FIXME: Currently, this DOES not update the database schema if an an older version database
     is found (and that is not checked for).
     """
+    
     # Check if the tables already exist by checking if one of the tables in your models exists
     with warnings.catch_warnings():
         # suppressing warning about discouraging access to database during app initialisation
@@ -65,7 +113,7 @@ def setup_migrations_location(migrations_location):
 
 
 def setup_django(db_file=None,
-                 migrations_location={}):
+                 migrations_location={}, logdict={}):
     """
     Used to setup the django settings from within our code, rather than
     having it as a file - this way we can change settings dynamically.
@@ -95,8 +143,11 @@ def setup_django(db_file=None,
             },
             TIME_ZONE='UTC',
             USE_TZ=True,
-            MIGRATION_MODULES=migrations_location
+            MIGRATION_MODULES=migrations_location,
+            LOGGING = set_logging_level(logdict)
+            #LOGGING_CONFIG=None   
         )
+
 
         django.setup()
 

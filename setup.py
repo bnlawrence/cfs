@@ -11,6 +11,8 @@ setup(
         'django',
         'click',
         'rich',
-        'tqdm'
+        'tqdm',
+        'cf',
+        'h5netcdf'
         ]
     )

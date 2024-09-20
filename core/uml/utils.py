@@ -295,7 +295,7 @@ class PlantUml:
         :return: representation
         """
         uml = ''
-        one_to_one_line = '--'
+        one_to_one_line = '<--'
         foreign_line = 'o-->'
         foreign_cascade_line = '<--*'
         #many_to_many_line = '"*" -- "*"'
@@ -308,9 +308,8 @@ class PlantUml:
             if self.with_omitted_headers or self.is_allowed_related(related):
                 related_meta = related.foreign_related_fields[0].model._meta
                 line = foreign_line if type(related).__name__ == "ForeignKey" else one_to_one_line
-                if line == foreign_line:
-                    if related.remote_field.on_delete.__name__=='CASCADE':
-                        line = foreign_cascade_line
+                if related.remote_field.on_delete.__name__=='CASCADE':
+                    line = foreign_cascade_line
                 print(meta.label, line, related_meta.label)
                 uml += f'{meta.label} {line} {related_meta.label}\n'
         for related in list(filter(lambda x: type(x).__name__ == 'ManyToManyField', fields)):
