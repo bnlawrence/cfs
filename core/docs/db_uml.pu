@@ -1,5 +1,41 @@
 @startuml 
 hide attributes
+class db.Cell_Method #e4f4d6 {
+    + id (BigAutoField)
+    + method (CharField)
+    + axis (CharField)
+}
+
+
+class db.Cell_MethodSet #e4f4d6 {
+    + id (BigAutoField)
+    + key (CharField)
+    # methods (ManyToManyField)
+}
+db.Cell_MethodSet o--o db.Cell_Method
+
+
+class db.CollectionType #e4f4d6 {
+    - id (AutoField)
+    + value (TextField)
+    + key (CharField)
+}
+
+
+class db.Collection #e4f4d6 {
+    + _proxied (JSONField)
+    + name (CharField)
+    + description (TextField)
+    - id (AutoField)
+    # type (ManyToManyField)
+    # tags (ManyToManyField)
+    # variables (ManyToManyField)
+}
+db.Collection o--o db.CollectionType
+db.Collection o--o db.Tag
+db.Collection o--o db.Variable
+
+
 class db.Domain #e4f4d6 {
     - id (AutoField)
     + name (CharField)
@@ -11,24 +47,6 @@ class db.Domain #e4f4d6 {
     + bbox_tr (FloatField)
     + bbox_bl (FloatField)
     + bbox_br (FloatField)
-}
-
-
-class db.TimeDomain #e4f4d6 {
-    + id (BigAutoField)
-    + interval (PositiveIntegerField)
-    + interval_units (CharField)
-    + units (CharField)
-    + calendar (CharField)
-    + starting (FloatField)
-    + ending (FloatField)
-}
-
-
-class db.Location #e4f4d6 {
-    - id (AutoField)
-    + name (CharField)
-    + volume (PositiveBigIntegerField)
 }
 
 
@@ -48,9 +66,16 @@ db.File o--o db.Location
 db.File .- db.File_type
 
 
+class db.Location #e4f4d6 {
+    - id (AutoField)
+    + name (CharField)
+    + volume (PositiveBigIntegerField)
+}
+
+
 class db.Manifest #e4f4d6 {
     - id (AutoField)
-    ~ cfa_file (OneToOneField)
+    ~ cfa_file (ForeignKey)
     + bounds (BinaryField)
     + units (CharField)
     + calendar (CharField)
@@ -61,60 +86,31 @@ db.Manifest <--* db.File
 db.Manifest o--o db.File
 
 
-class db.Tag #e4f4d6 {
-    - id (AutoField)
-    + name (CharField)
-}
-
-
-class db.CollectionType #e4f4d6 {
-    - id (AutoField)
-    + value (TextField)
-    + key (CharField)
-}
-
-
-class db.Collection #e4f4d6 {
-    + _proxied (JSONField)
-    + name (CharField)
-    + volume (PositiveBigIntegerField)
-    + description (TextField)
-    - id (AutoField)
-    + batch (BooleanField)
-    # files (ManyToManyField)
-    # type (ManyToManyField)
-    # tags (ManyToManyField)
-    # variables (ManyToManyField)
-}
-db.Collection o--o db.File
-db.Collection o--o db.CollectionType
-db.Collection o--o db.Tag
-db.Collection o--o db.Variable
-
-
 class db.Relationship #e4f4d6 {
     + id (BigAutoField)
     + predicate (CharField)
     ~ subject (ForeignKey)
     ~ related_to (ForeignKey)
 }
-db.Relationship <-* db.Collection
-db.Relationship <-* db.Collection
+db.Relationship <--* db.Collection
+db.Relationship <--* db.Collection
 
 
-class db.Cell_Method #e4f4d6 {
-    + id (BigAutoField)
-    + method (CharField)
-    + axis (CharField)
+class db.Tag #e4f4d6 {
+    - id (AutoField)
+    + name (CharField)
 }
 
 
-class db.Cell_MethodSet #e4f4d6 {
+class db.TimeDomain #e4f4d6 {
     + id (BigAutoField)
-    + key (CharField)
-    # methods (ManyToManyField)
+    + interval (PositiveIntegerField)
+    + interval_units (CharField)
+    + units (CharField)
+    + calendar (CharField)
+    + starting (FloatField)
+    + ending (FloatField)
 }
-db.Cell_MethodSet o--o db.Cell_Method
 
 
 class db.VariableProperty #e4f4d6 {
@@ -132,12 +128,14 @@ class db.Variable #e4f4d6 {
     ~ time_domain (ForeignKey)
     ~ cell_methods (ForeignKey)
     ~ in_file (ForeignKey)
+    ~ in_manfest (ForeignKey)
     # key_properties (ManyToManyField)
 }
 db.Variable o--> db.Domain
 db.Variable o--> db.TimeDomain
 db.Variable o--> db.Cell_MethodSet
 db.Variable <--* db.File
+db.Variable o--> db.Manifest
 db.Variable o--o db.VariableProperty
 
 
