@@ -1,6 +1,5 @@
 from core.db.standalone import setup_django
 from pathlib import Path
-import pytest
 
 
 def test_blank_database(tmp_path, request):
@@ -25,6 +24,7 @@ def test_blank_database(tmp_path, request):
     files = File.objects.all()
     assert len(files) == 2
 
+    # manual cleanup
     for f in files:
         f.delete()
     

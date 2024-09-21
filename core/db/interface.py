@@ -22,162 +22,171 @@ def get_obj_field(obj, key):
     return obj[key]
 #FIXME: When and how is the filter used, it's come from the old db.py, but it's a GOB thing.
 
-class CollectionDB:
 
+class GenericHandler:
+    """
+    A reusable mixin that provides create, retrieve, and get_or_create
+    methods for the overall interface to the various model classes. 
+    """
+    def __init__(self, model_class):
+        self.model = model_class
+
+    def all(self):
+        return self.model.objects.all()
+    
+    def count(self):
+        return self.model.objects.count()
+
+    def create(self, **kwargs):
+        """
+        Create a new instance of the model.
+        """
+        instance = self.model(**kwargs)
+        try:
+            instance.save()
+        except Exception as e:
+            if str(e).startswith('UNIQUE constraint'):
+                raise ValueError(f'{self.model.__name__} instance with unique constraint already exists.')
+        return instance
+
+    def retrieve_all(self, **kwargs):
+        """
+        Retrieve all existing intnaces based on keywords.
+        """
+        try:
+            return self.model.objects.filter(**kwargs).all()
+        except self.model.DoesNotExist:
+            raise ValueError(f'No {self.model.__name__} instance matching {kwargs}')
+    
+    def retrieve(self, **kwargs):
+        """ 
+        Retrieve a single instance, raise an error if multiple items match the query,
+        return None if none found.
+        """
+        results = self.retrieve_all(**kwargs)
+        nresults = len(results)
+        if nresults == 0:
+            if self.model.__name__=='File':
+                raise FileNotFoundError
+            else:
+                return None
+        elif nresults > 1: 
+            raise ValueError('Unable to match a single {self.model.__name__} - got {nresults} instances')
+        return results[0]
+
+    def get_or_create(self, **kwargs):
+        """
+        Class method to get an existing instance or create a new one if it doesn't exist.
+        """
+        instance, created = self.model.objects.get_or_create(**kwargs)
+        return instance, created
+    
+    def queryset_delete(self, queryset):
+        """ 
+        Delete a specific set of instances returned from some query against this model.
+        """
+        if queryset.model != self.model:
+            raise PermissionError(
+                f'Attempt to delete a queryset of{queryset.model} with {self.model.__name__}.queryset_delete')
+        for thing in queryset:
+            thing.delete()
+
+    
+
+
+class CellMethodsInterface(GenericHandler):
 
     def __init__(self):
-        self.varprops = {v:k for k, v in VariablePropertyKeys.choices}
-
-    @property
-    def _tables(self):
-        """
-        List the names of all the tables in the database interface
-        """
-        return self.engine.table_names()
+        super().__init__(Cell_Method)
     
-    def _construct_properties(self,varprops, ignore_proxy=False):
+    def set_get_or_create(self, methods):
         """ 
-        Used to parse a set of variable properties in words into appropriate
-        model instances for inserting and querying the database
+        Handles getting and creating cell methods as a set.
+        Expects each element of the method set to be 
+        : methods : list of (axis, method) pairs
+        : returns : An instance of CellMethodSet
         """
-
-        definition, extras = {'key_properties':[]},{}
-        
-        for key in varprops:
-            if key in VariablePropertyKeys.labels:
-                ekey = self.varprops[key]
-                out_value, create = VariableProperty.objects.get_or_create(
-                                        key=ekey, value=varprops[key])
-                definition['key_properties'].append(out_value)
-            elif key == 'spatial_domain':
-                definition[key]=self.domain_get_or_create(varprops[key])
-            elif key == 'time_domain':
-                definition[key]=self.temporal_get_or_create(varprops[key])
-            elif key == 'cell_methods':
-                method_set = self.cell_methods_get_or_create(varprops[key])
-                definition[key]=method_set
-            elif key == 'in_file':
-                definition[key]=varprops[key]
-            else:
-                extras[key]=varprops[key]
-        if not ignore_proxy:
-            definition['_proxied']=extras
-        if 'cell_methods' not in definition:
-            definition['cell_methods'] = None
-        return definition
-
-    def cell_methods_get_or_create(self, methods):
-        """ Handles getting and creating cell methods """
-        methods = [self.cell_method_get_or_create(*m) for m in methods]
+        methods = [self.get_or_create_by_pair(m) for m in methods]
         method_set = Cell_MethodSet.get_or_create_from_methods(methods)
         return method_set
 
-
-    def cell_method_add(self, axis, method):
-        """
-        Add a new cell method to database, raise an error if it already exists.
-        Returns the new cell method.
-        """
-        try:
-            cm = self.cell_method_retrieve(axis=axis, method=method)
-        except Cell_Method.DoesNotExist:
-            cm = Cell_Method(axis=axis, method=method)
-            return cm
-        else:
-            raise ValueError(f"Attempt to add an existing cell method {cm}")
-
-    def cell_method_get_or_create(self, axis, method):
-        """
-        Retrieve a specfic cell method, if it doesn't exist, create it, and return it.
-        """
-        cm, created = Cell_Method.objects.get_or_create(axis=axis, method=method)
-        if created:
-            cm.save()
+    def get_or_create_by_pair(self, method):
+        """ 
+        The standard cell method creation interface takes a pair 
+        of key words, this interface just takes a method described
+        as a tuple pair.
+        : method : tuple describing a cell method (axis, method)
+        : returns : A CellMethod instance
+        """    
+        kw = {k:v for k,v in zip(['axis','method'],list(method))}
+        cm, created = self.get_or_create(**kw)
         return cm
+    
+    def retrieve(self,method):
+        """ Retrieve a cell method supplied as a tuple"""
+        kw = {k:v for k,v in zip(['axis','method'],list(method))}
+        return super().retrieve(**kw)
+
+class CollectionInterface(GenericHandler):
+    
+    def __init__(self):
+        super().__init__(Collection)
+
+    def create(self,name, description='(none)', kw={}):
+        """ Convenience Interface """
+        
+        kwargs = {'name':name, 'description':description,'_proxied':kw.pop('_proxied',{})}
+        understood = vars(Collection)
+        for k,v in kw.items():
+            if k in understood:
+                kwargs[k]=v
+            else:
+                kwargs['_proxied'][k]=[v]
        
-    def cell_method_retrieve(self, axis, method):
+        return super().create(**kwargs)
+
+    
+    def add_variable(self, variable):
         """
-        Retrieve a specific cell method
+        Add a variable to the existing collection.
         """
-        cm = Cell_Method.objects.get(axis=axis, method=method)
+        self.model.variables.add(variable)
 
-        return cm
-
-
-    def clone(self, instance):
-        instance.pk = None
-        instance.save()
-        return instance
-
-    def collection_aggregate_existing(
-        self, grouping, name, description="Saved collection", grouping_id="collections"
-        ):
+    def delete(self, collection, force=False, unique_only=True):
         """
-        Groups already stored collections into new named collection
+        Delete any related variables.
         """
-        #def save_as_collection(
-        c = self.create_collection(name, description=description)
-        if grouping_id == "variables":
-            for var in grouping:
-                self.add_variable_to_collection(name,var)
-                for file in var.in_files:
-                    self.file_add_to_collection(c.name, file)
-        else:
-            for col in grouping:
-                files = self.files_retrieve_in_collection(col.name)
-                variables = self.variables_retrieve_in_collection(col.name)
-                for var in variables:
-                    self.variable_add_to_collection(c.name, var)
-                    var.save()
-                for file in files.distinct():
-                    try:
-                        self.file_add_to_collection(c.name, file, skipvar=True)
+        collection.do_empty(force, unique_only)
+        collection.delete()
 
-                    except:
-                        pass
-                    file.save()
-
-
-    def collection_create(self, collection_name, description=None, kw={}):
+    
+    def retrieve(self, name_contains=None, description_contains=None, 
+                 contains=None, tagname=None, facet=None):
         """
-        Add a collection and any properties, and return instance
+        Retrieve collections based on various filters.
         """
-        #def create_collection(self, collection_name, description=None, kw={}):
-        if not description:
-            description = "No Description"
-        # c = Collection.objects.get(name=collection_name)[0]
-        c = Collection(
-            name=collection_name,
-            volume=0,
-            description=description,
-            batch=1,
-            _proxied={},
-        )
+        if [name_contains, description_contains, contains, tagname, facet].count(None) <= 3:
+            raise ValueError("Cannot search on more than one of name, description, tag, facet")
+        #FIXME much of this is redundant
+        
+        if name_contains:
+            return Collection.objects.filter(name__contains=name_contains)
+        if description_contains:
+            return Collection.objects.filter(description__contains=description_contains)
+        if contains:
+            return Collection.objects.filter(
+                Q(name__contains=contains) | Q(description__contains=contains)
+            )
+        if tagname:
+            return Collection.objects.filter(tags__name=tagname)
+        if facet:
+            key, value = facet
+            query = {f'_proxied__{key}': value}
+            return Collection.objects.filter(**query)
 
-        # This doesn't exist in the latest GOB code, but I don't know why it was removed
-        for k in kw:
-            c[k] = kw[k]
-
-        #    c.volume += k.size
-        try:
-            c.save()
-        except Exception as e:
-            if str(e).startswith('UNIQUE constraint'):
-                raise ValueError('DB IntegrityError: most likely a collection of this name already exists')
-        return c
-
-    def collection_delete(self, collection_name, force=False, unique_only=True):
-        """
-        Remove a collection from the database, ensuring all unique files have already been removed first
-        unless force is true. If force is true, delete_colletion will also delete all the unique files
-        in the collection. If not unique_only, then all files will be deleted from the collection, even
-        those which appear in other collections. Be careful.
-        """
-
-        c = self.collection_retrieve(collection_name)
-        c.do_empty(force, unique_only)
-        c.delete()
-
+        return Collection.objects.all()
+    
+        
     def collection_delete_subdirs(self, collection, self_destruct=False):
         """ 
         This deletes all the subdirectories of a specific collection,
@@ -230,7 +239,7 @@ class CollectionDB:
                     col.files.add(newfile)
                     newfile.save()
 
-    def collection_type_add(self, collection, key, value):
+    def add_type(self, collection, key, value):
         """ 
         Add a particular collection property to the collection.
         These key,value pairs should only be used when they 
@@ -240,30 +249,26 @@ class CollectionDB:
         : key : key to add 
         : value : key to use 
         """
-        if not isinstance(collection,Collection):
-            collection=self.collection_retrieve(collection)
+        if not isinstance(collection, Collection):
+            collection=self.retrieve_by_name(collection)
         if key == '_type':
             try:
                 value = FileType.get_value(value)
             except KeyError:
                 raise ValueError('The special collection key _type must have value which is a FileType key')
         term, created = CollectionType.objects.get_or_create(key=key,value=value)
-        if created:
-            term.save()
         collection.type.add(term)
 
-    def collection_retrieve(
-        self, collection_name):
+    def retrieve_by_name(self, collection_name):
         """
         Retrieve a particular collection via it's name <collection_name>.
         """
-        #def retrieve_collection(
-        try:
-            c = Collection.objects.get(name=collection_name)
-        except Collection.DoesNotExist:
-            raise ValueError(f"No such collection {collection_name}")
-        assert c.name == collection_name
-        return c
+        results = self.retrieve(name_contains=collection_name)
+        if len(results) == 0:
+            raise ValueError(f'Collection {collection_name} not found')
+        else:
+            # uniquness enforced by model 
+            return results[0]
 
     def collections_retrieve(
         self,
@@ -293,16 +298,16 @@ class CollectionDB:
             )
 
         if name_contains:
-            return Collection.objects.filter(name__contains=name_contains)
+            return Collection.objects.filter(name__contains=name_contains).all()
         elif description_contains:
-            return Collection.objects.filter(description__contains=description_contains)
+            return Collection.objects.filter(description__contains=description_contains).all()
         elif contains:
 
             return Collection.objects.filter(
-                Q(name__contains=contains) | Q(description__contains=contains)
+                Q(name__contains=contains) | Q(description__contains=contains).all()
             )
         elif tagname:
-            return Collection.objects.filter(tags__name=tagname)
+            return Collection.objects.filter(tags__name=tagname).all()
             # tag = Tag.objects.get(name=tagname)
             # return tag.in_collections
         elif facet:
@@ -312,268 +317,130 @@ class CollectionDB:
             key, value = facet
             # return Collection.objects.filter(properties_key=key, properties_value=value)
             query = {f'_proxied__{key}': value}
-            return Collection.objects.filter(**query)
+            return Collection.objects.filter(**query).all()
         else:
             return Collection.objects.all()
+        
 
-    def domain_delete(self, domain_name):
-        d = Domain.objects.get(name=domain_name)
-        d.delete()
+class DomainInterface(GenericHandler):
+        
+    def __init__(self):
+        super().__init__(Domain)
+
+
+    def get_or_create(self,kw):
+        td, created = super().get_or_create(**kw)
+        return td
     
-    def domain_get_or_create(self, properties):
-        """ Attempt to retrieve a domain based on properties, and if it doesn't
-        exist, create it and return it."""
-        d, created = Domain.objects.get_or_create(**properties)
-        if created:
-            d.save()
-        return d
-    
-    def domain_retrieve(self, properties):
+    def retrieve(self, **properties):
         """ 
         Retreive domain by properties
         """
-        d = Domain.objects.filter(**properties).all()
+        d = super().retrieve(**properties)
         if len(d) > 1:
             raise ValueError('Multiple domains match your query')
         return d[0]
     
-    def domain_retrieve_by_name(self, name):
+    def retrieve_by_name(self, name):
         """ 
         Retrieve spatial domain by name
         """
         try:
-            return Domain.objects.get(name=name)
+            return super().retrieve(name=name)
         except:
             return None
 
-    def domains_all(self):
+    def all(self):
         """ 
         Get all the domains
         """
         return Domain.objects.all()
+
+
+class FileInterface(GenericHandler):
     
+    def __init__(self):
+        super().__init__(File)
+        self.location=LocationInterface()
 
-    def file_add_to_collection(self,
-                               collection_name,
-                               file_instance,
-                               skipvar=False):
+    def _doloc(self, properties):
+        location = properties.pop('location',None)
+        if location is None:
+            raise ValueError('Cannot create a file without putting it in a location')
+        if not isinstance(location,Location):
+            location, created = self.location.get_or_create(name=location)
+        return properties, location
+
+
+    def findall_with_variable(self, variable):
         """
-        Add file instance to a collection. Raise an error if it is
-        already there. Optionally add variables from file at the same time.
-        (Default is always to add variables.)
+        Find all files with a given variable
         """
-        f = file_instance
-        c = Collection.objects.get(name=collection_name)
-        if c.files.filter(path=f.name).exists():
-            raise PermissionError(
-                f"Attempt to add file {f.name} to {c.name} - but it's already there")
-        c.files.add(f)
-        c.volume += f.size
-        if not skipvar:
-            for variable in f.variable_set.all():
-                self.add_variable_to_collection(c.name, variable)
-        c.save()
-
-    def file_delete_from_collection(self, collection, path):
-        """
-        Delete a file from a collection
-        """
-
-        f = self.file_retrieve_by_properties(path=path)
-
-        c = Collection.objects.get(name=collection)
-
-        if f not in c.files.all():
-            print(
-                f"Attempt to delete file {f} from {c} - but it's already not there"
-            )
-        c.files.remove(f)
-
-        f.save()
-        c.save()
-
-    def file_find_all_with_variable(self, variable):
-        """Find all files with a given variable"""
         return variable.in_files.all()
-
-    def file_remove_from_collection(self, collection_instance, file_instance):
-        """
-        Remove a file instance from a collection instance
-        """
-        collection_instance.files.remove(file_instance)
-
-    def file_remove_from_named_collection(self,  collection_name, file_instance,):
-        """
-        Remove a file instance from a collection with collection identified by
-        name.
-        """
-        c = self.collection_retrieve(collection_name)
-        self.file_remove_from_collection(c, file_instance)
-
-    def file_retrieve_by_properties(self, name=None, path=None, size=None, checksum=None, unique=True):
-        """
-        Find a file instance by propeties. If unique, raise an error if the properties
-        provided do not result in a unique file, otherwise return all matching files.
-        Raise an error if no such file.
-        """
-        #def retrieve_file
-        #def retrieve_files_by_name
-        #def retrieve_file_if_present(self, **kw):
-        properties={}
-        for k,v in {'name':name, 'path':path, 'size':size, 'checksum':checksum}.items():
-            if v is not None:
-                properties[k]=v
-        fset = File.objects.filter(**properties).all()
-        if len(fset) == 0:
-            raise FileNotFoundError(f'No file found for {properties}')
-        elif len(fset) > 1:
-            if unique:
-                raise ValueError(f'{properties} describes multiple files')
-        return fset[0]
-
-    def files_qsdelete(self, queryset):
-        """ 
-        Delete a specific set of files returned from some query against the file database
-        """
-        if queryset.model != File:
-            raise PermissionError(f'Attempt to delete a queryset of{queryset.model} with files_delete')
-        queryset.delete()
     
-    def files_retrieve_by_type(self,type):
+    def findall_by_type(self,type):
+        """
+        Find all files of a given type 
+        """
         if type not in FileType:
             raise ValueError(f'Cannot query files by invalid type {type}')
         return File.objects.filter(type=type).all()
     
-    def files_retrieve_from_variables(self, variables):
+    def findall_from_variableset(self, variables):
+        """ 
+        Find all files from a given set of variables
+        """
         files = File.objects.filter(variable__in=variables)
         return files
+    
+    def create(self, **properties):
 
-    def files_retrieve_in_collection(self, collection, match=None, replicants=True):
-        """
-        Return a list of files in a particular <collection>, possibly including those
-        where something in the file name or path matches a particular string <match>
-        and/or are replicants. The default <replicants=True> returns all files,
-        if <replicants=False> only those files within a collection which have only
-        one location are returned.
-        """
-
-        dbcollection = self.collection_retrieve(collection)
-
-        if match is None and replicants is True:
-            return dbcollection.files.all()
-
-        if match:
-            files = dbcollection.files.filter(Q(name__contains=match) | Q(path__contains=match))
+        properties, location = self._doloc(properties)
+        file = super().create(**properties)
+        file.locations.add(location)
+        location.volume += file.size
+        location.save()
+        return file
+    
+    def get_or_create(self, **properties):
+        properties, location = self._doloc(properties)
+        file, created = super().get_or_create(**properties)
+        if not created and location in file.locations.all():
+            logger.warning('Adding an existing file to a location where it already exists')
         else:
-            files = dbcollection.files
+            file.locations.add(location)
+            location.volume += file.size
+            location.save()
+        return file, created
+    
+    def in_location(self, location_name):
 
-        if replicants:
-            return files.all()
-        else:
-            return files.annotate(location_count=Count('locations')).filter(location_count=1).all()
+        return File.objects.filter(locations__name=location_name).all()
+        
+    
+class LocationInterface(GenericHandler):
+    def __init__(self):
+        super().__init__(Location)
 
+    def create(self, name):
+        return super().create(name=name)
 
-    def files_retrieve_in_collection_and_elsewhere(
-        self, collection_name, by_properties=False):
-        """
-        For a given collection, find all its files which are also in other collections.
-        The fast version of this (by_properties=False) simply looks at the files which
-        are not unique to this collection. The slow version will look for file duplicates
-        which match on properties (name, size, checksum).
-        That could be excrutiatingly slow.
-        We may need indexes for at least 'name' and 'checksum'.
-        """
-        #def retrieve_files_in_collection_and_elsewhere(
-        #FIXME: replacement for locate_replicants, there will be consequences
-        collection = self.collection_retrieve(collection_name)
-        files = collection.files.all()
-        if not by_properties:
-            # We go from files in collection, rather than files in general, because
-            # annotating all files will be expensive. It's bad enough we have to do this.
-            # this doesn't work because django has been too clever
-            # files = files.annotate(collection_count=Count('collection'))
+    def retrieve(self, location_name):
+        return super().retrieve(name=location_name)
 
-            collection_count_subquery = Collection.objects.filter(
-                files=OuterRef('pk')).values('files').annotate(count=Count('id')).values('count')
-
-            files = files.annotate(collection_count=
-                                  Subquery(collection_count_subquery)).filter(
-                                      collection_count__gt=1).distinct()
-        else:
-            # this can't be quick without indexes for all these
-            # it might be best to index just a couple of those
-            # and do it in two steps.
-            allfiles = File.objects.all()
-            duplicates = allfiles.values('name','size','checksum').annotate(
-                        file_count=Count('id'))
-            #print([(d['name'],d['file_count']) for d in duplicates])
-            duplicates = duplicates.filter(file_count__gt=1)
-            files = files.filter(name__in=[item['name'] for item in duplicates],
-                                 size__in=[item['size'] for item in duplicates],
-                                 checksum__in=[item['checksum'] for item in duplicates])
-        return files
-
-    def files_retrieve_in_location(self,location_name):
-        files = File.objects.filter(locations__name=location_name).all()
-        return files
-
-    def files_retrieve_which_match(self,match):
-        """
-        Retrieve files where <match> appears in either the path or the name.
-        """
-        #def retrieve_files_which_match(self, match):
-        m = f"%{match}%"
-        return (
-            File.objects
-            .filter(Q(name__contains= m) | Q(path__contains=m))
-            .all()
-        )
-
-    def location_create(self, location):
-        """
-        Create a storage <location>. The database is ignorant about what
-        "location" means. Other layers of software care about that.
-        """
-        #def create_location(
-        loc = Location.objects.filter(name=location)
-        if loc:
-            raise PermissionError('Cannot create {location} - it already exists')
-        else:
-            loc = Location.objects.create(name=location, volume=0)
-            loc.save()
-            return loc
+    def find_all(self):
+        return Location.objects.all()
+    
+    def delete(self, name):
+        instance = self.retrieve(name)
+        instance.delete()
 
 
-    def location_delete(self, location_name):
-        """
-        Remove a location from the database, ensuring all collections have already been removed first.
-        #FIXME check collections have been removed first
-        """
-        loc = Location.objects.filter(name=location_name)
-        loc.delete()
+class ManifestInterface(GenericHandler):
+    def __init__(self):
+        super().__init__(Location)
 
-    def location_retrieve(self, location_name):
-        """
-        Retrieve information about a specific location
-        """
-        #def retrieve_location
-        try:
-            x = Location.objects.get(name=location_name)
-        except Location.DoesNotExist:
-            raise ValueError(f"No such collection {location_name}")
-        return x
-
-    def locations_retrieve(self):
-        """
-        Retrieve locations.
-        Currently retrieves all known locations.
-        """
-        #def retrieve_locations
-        locs = Location.objects.all()
-        return locs
-
-
-    def manifest_add(self, properties):
+    def add(self, properties):
         """
         Add a CFA manifest
         This should always be unique.
@@ -595,67 +462,41 @@ class CollectionDB:
             m.fragments.add(*file_objects)
             # no saves needed, all done by the transaction
 
-    def organise(self, collection, files, description):
-        """
-        Organise files already known to the environment into collection,
-        (creating collection if necessary)
-        No longer needed as files can only be uploaded into collectionsl
-        """
-        raise NotImplementedError
+    def get_or_create(self):
+        """ We do not want to allow access to the superclass method"""
+        raise NotImplemented
 
 
-    def protocol_add(self, protocol_name, locations=[]):
-        """
-        Add a new protocol to the database, and if desired modify a set of existing or new
-        locations by adding the protocol to their list of supported protocols.
-        """
-        #def add_protocol
-        try:
-            pdb = Protocol.objects.get(name=protocol_name)
-        except Protocol.DoesNotExist:
-            pdb = Protocol(name=protocol_name)
-            pdb.save()
-            if locations:
-                existing_locations = [e.name for e in self.locations_retrieve()]
-                for p in locations:
-                    if p not in existing_locations:
-                        loc = Location(name=p)
-                    else:
-                        loc = self.location_retrieve(p)
-                    loc.protocols.add(pdb)
-                    loc.save()
-        else:
-            raise ValueError(f"Attempt to add existing protocol - {protocol_name}")
+class RelationshipInterface(GenericHandler):   
+    def __init__(self):
+        super().__init__(Relationship)
+        self.collection=CollectionInterface()
 
-    def protocols_retrieve(self):
-        """
-        Retrieve protocols.
-        """
-        #def retrieve_protocols(self):
-        p = Protocol.objects.all()
-        return p
-
-    def relationship_add(self, collection_one, collection_two, relationship):
+    def add_single(self, collection_one, collection_two, relationship):
         """
         Add a oneway <relationship> between <collection_one> and <collection_two>.
         e.g. add_relationship('julius','betrayed_by','brutus')
-        brutus is not betrayed_by julius.
+        brutus is not betrayed_by julius. 
+        : collection_one : subject collection name
+        : collection_two : object collection name
+        : relationship : predicate
+        : returns : relationship instance
         """
         #def add_relationship(self, collection_one, collection_two, relationship):
-        c1 = self.collection_retrieve(collection_one)
-        c2 = self.collection_retrieve(collection_two)
+        c1 = self.collection.retrieve_by_name(collection_one)
+        c2 = self.collection.retrieve_by_name(collection_two)
 
         rel = Relationship(subject=c1, predicate=relationship, related_to=c2)
         rel.save()
         return rel
 
-    def relationship_delete(self, relationshipname):
+    def delete_by_name(self, relationshipname):
         """
         Delete a tag, from wherever it is used
         """
-        t = Relationship.objects.filter(name=relationshipname).delete()
+        super().delete(name=relationshipname)
 
-    def relationships_add(
+    def add_double(
         self, collection_one, collection_two, relationship_12, relationship_21):
         """
         Add a pair of relationships between <collection_one>  and <collection_two> such that
@@ -665,20 +506,18 @@ class CollectionDB:
         (It is possible to add a one way relationship by passing relationship_21=None)
         """
         #def add_relationships(
-        rel1 = self.relationship_add(collection_one, collection_two, relationship_12)
+        self.add_single(collection_one, collection_two, relationship_12)
         if relationship_21 is not None and collection_one != collection_two:
-            rel2 = self.relationship_add(
-                collection_two, collection_one, relationship_21
-            )
+            self.add_single(collection_two, collection_one, relationship_21)
 
-
-    def relationships_retrieve(self, collection, outbound=True, relationship=None):
+    
+    def retrieve(self, collection, outbound=True, relationship=None):
         """
         Find all relationships from or to a  <collection>, optionally
         which have <relationship> as the predicate.
         """
         #def retrieve_relationships(self, collection, relationship=None):
-        c = Collection.objects.get(name=collection)
+        c = self.collection.retrieve_by_name(collection)
         if relationship:
             if outbound:
                 r = c.related_to.objects 
@@ -692,147 +531,81 @@ class CollectionDB:
                 return c.subject.all()
 
 
-    def tag_collection(self, collection_name, tagname):
+class TagInterface(GenericHandler):
+
+    def __init__(self):
+        super().__init__(Tag)
+        self.collection=CollectionInterface()
+
+    def create(self,name):
+        super().create(name=name)
+
+    def add_to_collection(self, collection_name, tagname):
         """
         Associate a tag with a collection
         """
-        tag,s = self.tag_create(name=tagname)
-        c = self.collection_retrieve(collection_name)
+        tag, s = self.get_or_create(name=tagname)
+        c = self.collection.retrieve_by_name(collection_name)
         c.tags.add(tag)
 
-    def tag_create(
-            self, name):
-        """
-        Create a tag and insert into a database
-        """
-        #def create_tag(
-        t,s = Tag.objects.get_or_create(name=name)
-        t.save()
-        return t,s
-
-    def tag_delete(self, tagname):
-        """
-        Delete a tag, from wherever it is used
-        """
-        t = Tag.objects.filter(name=tagname).delete()
-
-    def tag_remove_from_collection(self, collection_name, tagname):
+    def remove_from_collection(self, collection_name, tagname):
         """
         Remove a tag from a collection
         """
-        c = self.collection_retrieve(collection_name)
+        c = self.collection.retrieve_by_name(collection_name)
         tag = Tag(name=tagname)
         c.tags.remove(tag)
 
-    def temporal_get_or_create(self, properties):
-        """ 
-        Get or create a time domain instance from the property string
-        """
-        td, created = TimeDomain.objects.get_or_create(**properties)
-        if created:
-            td.save()
+
+class TimeInterface(GenericHandler):
+    def __init__(self):
+        super().__init__(TimeDomain)
+    def get_or_create(self,kw):
+        td, created = super().get_or_create(**kw)
         return td
-  
-       
+   
 
-    def upload_file_to_collection(self, location, collection, f, lazy=0, update=True):
+class VariableInterface(GenericHandler):
+    def __init__(self):
+        super().__init__(Variable)
+        self.varprops = {v:k for k, v in VariablePropertyKeys.choices}
+        self.xydomain=DomainInterface()
+        self.tdomain=TimeInterface()
+        self.cellm=CellMethodsInterface()
+        self.file = FileInterface()
+
+    def _construct_properties(self,varprops, ignore_proxy=False):
+        """ 
+        Used to parse a set of variable properties in words into appropriate
+        model instances for inserting and querying the database
         """
-        Convenience API to upload_files_to_collection, simply wraps <f> into a list
-        and calls upload_files_to_collection. See that function for explanation of
-        arguments.
-        """
-        return self.upload_files_to_collection(location, collection, 
-                                               [f], lazy, update=True, progress=False )[0]
 
-
-    def upload_files_to_collection(self, location_name, collection_name, list_of_files,
-                                   lazy=0, update=True, progress=False):
-        """
-        Add a list of **new** files from a specific location into the database in a specific
-        collection.  The definition of new depends on the value of lazy.
-
-        : location_name : a location already known to the database
-        : collection_name : a collection already known to the database
-        : list_of_files :  list of files, with each file documented by a dictionary of properties.
-            The minimum set of property keys is {name, path, size}. Additional keys that are upderstood
-            include {format, checksum, checksum_method}
-        : lazy : determines how "new" is interpretted -
-            if lazy==0: a pre-existing file with the same full path name is considered a duplicate
-            if lazy==1: a pre-existing file with the same full path name  and size is considered a duplicate
-            if lazy==2: a pre-existing file with the same checksum is considered a duplicate.
-        : update : if a pre-existing file is found in another collection, then we are happy to
-                   include it in this collection. (default is True)
-        : progress : if True, a progress bar is shown (default is False)
-
-
-        : return : tuple containing the newly created files in a list, and an updated collection instance.
-        """
-        # make names a bit more digestable instide the function
-        collection, location, files = collection_name, location_name, list_of_files
-
-        try:
-            c = Collection.objects.get(name=collection)
-            loc = Location.objects.get(name=location)
-        except Collection.DoesNotExist:
-            raise ValueError("Collection not yet available in database")
-        except Location.DoesNotExist:
-            raise ValueError("Location not yet available in database")
-
-        results = []
-        if progress:
-            files = tqdm(files)
-
-        for f in files:
-            p = {k:v for k,v in f.items()}
-            name, path, size = f["name"], f["path"], f["size"]
-            if "checksum" not in f:
-                p["checksum"]="Unknown"
-            if "format" not in f:
-                p["format"] = os.path.splitext(name)[1]
-            check = False
-            try:
-                match lazy:
-                    case 0:
-                        check = self.file_retrieve_by_properties(
-                            path=f['path'], name=f['name'])
-                    case 1:
-                        check = self.file_retrieve_by_properties(
-                            path=f['path'], name=f['name'], size=f['size'])
-                    case 2:
-                        check = self.file_retrieve_by_properties(
-                            path=f['path'], name=f['name'], checksum=f['checksum'])
-                    case _:
-                        raise ValueError(f"Unexpected value of lazy {lazy}")
-            except FileNotFoundError:
-                pass
-
-            if check:
-                if not update:
-                    raise ValueError(
-                        f"Cannot upload file {check} as it already exists"
-                    )
-                else:
-                    file, created = File.objects.get_or_create(**p)
-                    if created:
-                        raise RuntimeError(f'Unexpected additional file created {f}')
+        definition, extras = {'key_properties':[]},{}
+        
+        for key in varprops:
+            if key in VariablePropertyKeys.labels:
+                ekey = self.varprops[key]
+                out_value, create = VariableProperty.objects.get_or_create(
+                                        key=ekey, value=varprops[key])
+                definition['key_properties'].append(out_value)
+            elif key == 'spatial_domain':
+                definition[key]=self.xydomain.get_or_create(varprops[key])
+            elif key == 'time_domain':
+                definition[key]=self.tdomain.get_or_create(varprops[key])
+            elif key == 'cell_methods':
+                method_set = self.cellm.set_get_or_create(varprops[key])
+                definition[key]=method_set
+            elif key == 'in_file':
+                definition[key]=varprops[key]
             else:
-                file, created = File.objects.get_or_create(**p)
-                if not created:
-                    raise RuntimeError(f'Unexpected failure to create file {f}')
-
-            c.volume += file.size
-            c.files.add(file)
-            file.locations.add(loc)
-            loc.volume += file.size
-            file.save()
-            # not doing anything with f.replicas right now
-            results.append(file)
-
-        c.save()
-        loc.save()
-        return results
-
-    def variable_add_to_collection(self, collection, variable):
+                extras[key]=varprops[key]
+        if not ignore_proxy:
+            definition['_proxied']=extras
+        if 'cell_methods' not in definition:
+            definition['cell_methods'] = None
+        return definition
+    
+    def add_to_collection(self, collection, variable):
         """
         Add variable to a collection
         """
@@ -841,21 +614,11 @@ class CollectionDB:
         c.variables.add(variable)
         c.save()
 
-    def variable_delete(self, var_name):
-        """
-        Remove a variable
-        """
-        var = Variable.objects.filter(identitity=var_name)
-        var.delete()
-
-    def variable_retrieve(self, key, value):
+    def retrieve_by_keyvalue(self, key, value):
         """Retrieve single variable by arbitrary property"""
-        results = self.variables_retrieve_all(key, value)
-        if not results.exists():
-            return results
-        return results[0]
+        return self.retrieve({key:value})
 
-    def variables_retrieve_by_queries(self, queries, from_collection=None):
+    def retrieve_by_queries(self, queries, from_collection=None):
         """Retrieve variable by a list of common query types, limit queries to collection
         if wished.
         Each element of the list is a key,value pair
@@ -916,12 +679,12 @@ class CollectionDB:
             return base.all()
     
 
-    def variable_retrieve_in_collection(self, collection):
+    def retrieve_in_collection(self, collection):
         collection = self.collection_retrieve(collection)
         variables = Variable.objects.filter(in_collection__in=collection)
         return variables
     
-    def variable_retrieve_or_make(self, varprops):
+    def get_or_create(self, varprops):
         """
         If there is a variable corresponding to varprops with the same full set of properties, 
         return it, otherwise create it. Varprops should be a dictionary which includes at least 
@@ -936,28 +699,18 @@ class CollectionDB:
             raise ValueError('Insufficient properties to create a variable')
         args = [props[k] for k in ['_proxied','key_properties','spatial_domain',
                                    'time_domain','cell_methods','in_file']]
+        print(args)
         var, created = Variable.get_or_create_unique_instance(*args)
         return var
-
-    def variable_search(self, key, value):
-        return self.variables_retrieve_by_queries([(key,value),])
     
-    def variables_all(self):
+    def all(self):
         return Variable.objects.all()
 
-    def variables_delete_all(self):
-        """
-        Remove all variables
-        """
-        vars = Variable.objects.all()
-        for var in vars:
-            var.delete()
-
-    def variables_retrieve_by_key(self, key, value):
-        return self.variables_retrieve_by_queries([(key,value),])
+    def retrieve_by_key(self, key, value):
+        return self.retrieve_by_queries([(key,value),])
 
 
-    def variables_retrieve_by_properties(self, properties, from_collection=None, unique=False):
+    def retrieve_by_properties(self, properties, from_collection=None, unique=False):
         """
         Retrieve variable by arbitrary set of properties expressed as a dictionary.
         (Basically an interface to retrieve_by_queries.)
@@ -969,11 +722,11 @@ class CollectionDB:
                 v = properties.pop(k)
                 if k == 'in_file':
                     if not isinstance(v, File):
-                        v = self.file_retrieve_by_properties(**v)
+                        v = self.file.retrieve(**v)
                     queries.append((k,v))
                 elif k == 'cell_methods':
                     for x in v:
-                        cm = self.cell_method_retrieve(*x)
+                        cm = self.cellm.retrieve(x)
                         queries.append(('cell_methods', cm))
 
         properties = self._construct_properties(properties)
@@ -986,9 +739,117 @@ class CollectionDB:
                     queries.append((k,vv))
             else:
                 queries.append((k,v))
-        results = self.variables_retrieve_by_queries(queries, from_collection=from_collection)
+        results = self.retrieve_by_queries(queries, from_collection=from_collection)
         if unique:
             if len(results) > 1:
                 raise ValueError('Query retrieved multiple variables ({c}) - but uniqueness was requested')
         return results
         
+
+class CollectionDB:
+
+
+    def __init__(self):
+        
+        self.collection=CollectionInterface()
+        self.variable=VariableInterface()
+        self.file=FileInterface()
+        self.manifest=ManifestInterface()
+        self.cell=CellMethodsInterface()
+        self.xydomain=DomainInterface()
+        self.tdomain=TimeInterface()
+        self.tag=TagInterface()
+        self.location=LocationInterface()
+        self.relationship=RelationshipInterface()
+
+
+    def clone(self, instance):
+        instance.pk = None
+        instance.save()
+        return instance
+
+    def upload_file_to_collection(self, location, collection, f, lazy=0, update=True):
+        """
+        Convenience API to upload_files_to_collection, simply wraps <f> into a list
+        and calls upload_files_to_collection. See that function for explanation of
+        arguments.
+        """
+        return self.upload_files_to_collection(location, collection, 
+                                               [f], lazy, update=True, progress=False )[0]
+
+
+    def upload_file_to_collection(self, location_name, collection_name, filedata):
+        """
+        Upload a file and set of variables described by <filedata> to the database.
+        This method should only be used for the first time these data are exposed
+        to the database. Use "update_file_location" to add aditional copies or
+        to move the data between locations known to the database.  
+
+        The first thing we do is check that the variables are not yet known to
+        the database. In the case of quarks, this will be ok as they will be subsets
+        of the atomic dataset already known to the database, so will appear
+        unique _for upload purposes_.
+
+        : location_name : the location where the file is stored
+        : collection_name : the primary collection for these data.
+        : filedata : A dictionary with the following structure
+        {'properties':{Dictionary of file properties},
+         'variables': List of dictionaries of variable properties.
+         'manifests': If the file is a CFA file, this will be as set of 
+                      manifests which describe the fragment 
+                      locations of variables which share the same fragment 
+                      files.}
+
+        This filedata dictionary should be generated by the parsefields_to_dict
+        routine which utilises CF python to build the necessary dictionary
+        content, including, for CFA files, the internal linkage between 
+        variables and manifests. (This is accomplished by the use of UUIDs 
+        which are constructed only for use in this method, and discarded 
+        during this upload to the databaes. 
+
+        """
+
+        try:
+            c = self.collection.get(name=collection_name)
+            loc = self.location.get(name=location_name)
+        except Collection.DoesNotExist:
+            raise ValueError("Collection not yet available in database")
+        except Location.DoesNotExist:
+            raise ValueError("Location not yet available in database")
+        
+        # manually controlling rollback
+        step = 0
+        created = []
+        try:
+            file = self.file.create(filedata['properties'])
+            created.append(file)
+            manifests={}
+            step = 1
+            for manifest in filedata['manifests']:
+                key = manifest.pop('manikey')
+                manifests[key] = self.manifest.create(manifest)
+                created.append(manifests[key])
+            step = 2
+            for v in filedata['variables']:
+                key = v.pop('manikey',None)
+                if key is not None:
+                    v['in_manifest'] = manifests[key]
+                v['in_file'] = file
+                var = self.variable.create(v)
+                created.append(var)
+        except Exception as e:
+            # roll back
+            items = len(created)
+            for c in reversed(created):
+                c.delete()
+            logger.fatal('Failure encountered at step {step}, {items} items deleted. Problem was:')
+            match step:
+                case 0:
+                    logger.fatal(filedata['properties'])
+                case 1:
+                    logger.fatal(filedata['manifest'])
+                case 2:
+                    logger.fatal(v)
+
+            msg = str(e)+f'(Failed after step {step}, {items} items deleted)'
+            raise Exception(msg)

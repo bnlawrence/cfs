@@ -7,6 +7,7 @@ from pathlib import Path
 
 from django.dispatch import receiver
 
+
 def sizeof_fmt(num, suffix="B"):
     for unit in ["", "Ki", "Mi", "Gi", "Ti", "Pi", "Ei", "Zi"]:
         if abs(num) < 1024.0:
@@ -15,86 +16,8 @@ def sizeof_fmt(num, suffix="B"):
     return "%.1f%s%s" % (num, "Yi", suffix)
 
 
-class Cell_Method(models.Model):
-    class Meta:
-        app_label = "db"
-    method = models.CharField(max_length=256)
-    axis = models.CharField(max_length=64)
-    def __str__(self):
-        return f"{self.axis} : {self.method}"
 
-class Cell_MethodSet(models.Model):
-    """ 
-    A hash table to make cell method searches efficient when needed
-    for variable identity matching. THe other option of directly
-    linking cell method make creating new variables very inefficient.
-    """
-    class Meta:
-        app_label = "db"
-    methods = models.ManyToManyField(Cell_Method)
-    key = models.CharField(max_length=64, unique=True)
-    def __str__(self):
-        return ','.join([str(m) for m in self.methods.all()])
-
-    @staticmethod
-    def generate_key(methods):
-        """Generate a unique key (e.g., hash) for a list of method ids."""
-        method_ids = sorted([str(method.id) for method in methods])  # Sort to avoid ordering issues
-        key_string = ",".join(method_ids)  # Create a string with sorted method ids
-        return hashlib.md5(key_string.encode('utf-8')).hexdigest()  # Create an MD5 hash
-
-    @classmethod
-    def get_or_create_from_methods(cls, methods):
-        """Retrieve or create a Cell_MethodSet based on the list of methods."""
-        key = cls.generate_key(methods)
-        method_set, created = cls.objects.get_or_create(key=key)
-        if created:
-            method_set.methods.set(methods)  # Set methods if it's a new Cell_MethodSet
-        return method_set
-
-
-class CollectionType(models.Model):
-    class Meta:
-        app_label = "db"
-
-    id = models.AutoField(primary_key=True)
-    value = models.TextField()
-    key = models.CharField(max_length=128)
-
-
-class Collection(models.Model):
-    class Meta:
-        app_label = "db"
-
-    def __len__(self):
-        return len(self._proxied)
-
-    def __iter__(self):
-        return iter(self._proxied)
-
-    def __getitem__(self, key):
-        return self._proxied[key]
-
-    def __contains__(self, key):
-        return key in self._proxied
-
-    def __setitem__(self, key, value):
-        self._proxied[key] = value
-
-    def __delitem__(self, key):
-        del self._proxied[key]
-
-    def __str__(self):
-        return f"{self.name} (v{self.variables.count()},f{self.n_files},{sizeof_fmt(self.volume)})"
-
-    _proxied = models.JSONField()
-    name = models.CharField(max_length=256, unique=True)
-    description = models.TextField()
-    id = models.AutoField(primary_key=True)
-    type = models.ManyToManyField(CollectionType)
-    tags = models.ManyToManyField("Tag")
-    variables = models.ManyToManyField("Variable")
-
+VALUE_KEYS = ['standard_name','long_name', 'identity', 'atomic_origin']
 
 class Domain(models.Model):
     """ 
@@ -128,6 +51,36 @@ class Domain(models.Model):
             s+= '\n'+','.join([self.bbox_bl,self.bbox_br,self.bbox_tl,self.bbox_tr])
         return s+'\n'
 
+    
+class TimeDomain(models.Model):
+
+    class Meta:
+        app_label="db"
+
+    interval =  models.PositiveIntegerField()
+    interval_units = models.CharField(max_length=3,default='d')
+    units = models.CharField(max_length=12,default='days')
+    calendar = models.CharField(max_length=12, default="standard")
+    starting = models.FloatField()
+    ending = models.FloatField()
+    
+    def resolution(self):
+        return f'{self.interval} {self.units}'
+    
+    def __str__(self):
+        return f'{self.interval} ({self.units}) from {self.starting} to {self.ending}'
+
+
+class Location(models.Model):
+    class Meta:
+        app_label = "db"
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=256)
+    volume = models.PositiveBigIntegerField()
+    
+    def __str__(self):
+        return f'{self.name} ({sizeof_fmt(self.volume)})'
 
 class FileType(models.TextChoices):
     """ 
@@ -221,6 +174,9 @@ class File(models.Model):
         We explicitly delete the variables because the sql delete cascade does not 
         run the variable delete method, and we need that to happen,
         """
+        for c in self.collection_set.all():
+            c.volume -= self.size
+            c.save()
         for l in self.locations.all():
             l.volume -= self.size
             l.save()
@@ -237,25 +193,6 @@ class File(models.Model):
         super().delete(*args,**kwargs)
 
 
-class Location(models.Model):
-    class Meta:
-        app_label = "db"
-
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=256)
-    volume = models.PositiveBigIntegerField(default=0)
-    
-    def __str__(self):
-        return f'{self.name} ({sizeof_fmt(self.volume)})'
-    
-    def delete(self):
-        if self.volume != 0:
-            raise ValueError(f'Cannot delete location (still holding {sizeof_fmt(self.volume)})')
-        else:
-            super().delete()
-
-
-
 class Manifest(models.Model):
     """
     Carrys information about the set of fragments sufficient to be able to temporally subset 
@@ -269,6 +206,165 @@ class Manifest(models.Model):
     units = models.CharField(max_length=20)
     calendar = models.CharField(max_length=20)
     total_size = models.PositiveBigIntegerField(null=True)
+    uuid = models.UUIDField()
+
+class Tag(models.Model):
+    class Meta:
+        app_label = "db"
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=64)
+
+#    collection_id = models.ForeignKey(Collection.id)
+#    collections = models.ManyToManyField(Collection)
+
+
+class CollectionType(models.Model):
+    class Meta:
+        app_label = "db"
+
+    id = models.AutoField(primary_key=True)
+    value = models.TextField()
+    key = models.CharField(max_length=128)
+
+
+class Collection(models.Model):
+    class Meta:
+        app_label = "db"
+
+    def __len__(self):
+        return len(self._proxied)
+
+    def __iter__(self):
+        return iter(self._proxied)
+
+    def __getitem__(self, key):
+        return self._proxied[key]
+
+    def __contains__(self, key):
+        return key in self._proxied
+
+    def __setitem__(self, key, value):
+        self._proxied[key] = value
+
+    def __delitem__(self, key):
+        del self._proxied[key]
+
+    def __str__(self):
+        return f"{self.name} (v{self.variables.count()},f{self.n_files},{sizeof_fmt(self.volume)})"
+
+    _proxied = models.JSONField()
+    name = models.CharField(max_length=256, unique=True)
+    volume = models.PositiveBigIntegerField()
+    description = models.TextField()
+    id = models.AutoField(primary_key=True)
+    batch = models.BooleanField()
+    #files = models.ManyToManyField(File)
+    type = models.ManyToManyField(CollectionType)
+    tags = models.ManyToManyField(Tag)
+    variables = models.ManyToManyField("Variable")
+
+    @property
+    def n_files(self):
+        return self.files.count()
+    
+    def unique_files(self):
+        """ 
+        Return a query set of all those files in this collection that are 
+        only in this collection
+        """
+        # this doesn't work because django has been too clever
+        # files = files.annotate(collection_count=Count('collection'))
+        # ignore what ChatGPT thinks!
+        collection_count_subquery = Collection.objects.filter(
+                files=OuterRef('pk')).values('files').annotate(count=Count('id')).values('count')
+    
+        files = self.files.annotate(collection_count=
+                                  Subquery(collection_count_subquery)).filter(
+                                      collection_count=1).all()
+        return files
+
+    def do_empty(self, delete_files=False, unique_only=True):
+        """ 
+        Remove all files from collection, possibly deleting them in the process 
+        depending on the arguments. Normally used as part of deletion logic elsewhere. 
+        
+        1: <delete_files=T><unique_only=T> Delete just the unique files. 
+        Raise an error if there are non-unique files in the collection.
+        
+        2: <delete_files=T><unique_only=F> Delete all the files in the collection.
+        This will delete files from other collections too. Be careful.
+        
+        3: <delete_files=F><unique_only=T> This should raise an error if there are any
+        unique files in the collection, otherwise it will remove files from the 
+        collection which (will still) exist in other collections.
+        
+        4: <delete_files=F><unique_only=F> Will raise an error if there are any files 
+        in the collection at all.
+        """
+        all_files = self.files.all()
+        unique_files = self.unique_files()
+        n_unique, n_all  = len(unique_files), len(all_files)
+        non_unique = n_all > n_unique
+        if delete_files:
+            if unique_only: # option 1
+                if non_unique:
+                    raise PermissionError(
+                        f'Cannot empty {self.name} (contains {n_unique} non-unique files)')
+                else:
+                    # avoid having go do a pre delete hook, since queryset
+                    # deletes do not run instnace delete methods 
+                    # unique_files.delete()
+                    for f in unique_files:
+                        f.delete()
+            else:  # option 2
+                for f in all_files:
+                    f.delete()
+        else:
+            if unique_only: # option 3
+                if n_unique == 0:
+                    self.files.remove(*all_files)
+                else:
+                    raise PermissionError(
+                        f'Cannot empty {self.name} (contains {n_unique} unique files)')
+            else: # option 4
+                if n_all > 0:
+                    raise PermissionError(
+                        f'Cannot empty {self.name} (contains {n_all} files)')
+
+    def delete(self,*args,**kwargs):
+        if self.n_files  > 0 :
+            raise PermissionError(f'Cannot delete non-empty collection {self.name} (has {self.n_files} files)')
+        super().delete(*args,**kwargs)
+
+    def list_files(self):
+        return self.name,[f.name for f in self.files.all()]
+
+@receiver(m2m_changed,sender=Collection.files.through)
+def intercept_file_removal(sender, instance, action, reverse, model, pk_set, **kwargs):
+    """
+    This function intercepts when a file is being removed from a collection. We are trying
+    to ensure that no file is removed from a collection if it exists only in that
+    collection. Such files can only be removed by a forced delete (see do_empty).
+    
+    Arguments:
+    - sender: The model managing the many-to-many relationship (Collection.files.through).
+    - instance: The Collection instance from which files are being removed.
+    - action: The type of action ('pre_add', 'post_add', 'pre_remove', 'post_remove', etc.).
+    - reverse: If True, reverse relation is being affected (related model's field instead).
+    - model: The model that is being added or removed (File).
+    - pk_set: The primary key set of the objects being added or removed.
+    """
+    # We're only interested in 'pre_remove'
+    if action == 'pre_remove':
+        for pk in pk_set:
+            file = File.objects.get(pk=pk)
+            collection_count = file.collection_set.count()
+            if collection_count <= 1:  # Only linked to the current collection
+                raise PermissionError(
+                    f"File '{file.name}' cannot be removed from collection '{instance.name}' because it is unique to this collection."
+                )
+            instance.volume -= file.size
 
 
 class Relationship(models.Model):
@@ -282,32 +378,42 @@ class Relationship(models.Model):
     subject = models.ForeignKey(Collection, related_name="related_to",on_delete=models.CASCADE)
     related_to = models.ForeignKey(Collection, related_name="subject",on_delete=models.CASCADE)
 
-
-class Tag(models.Model):
+class Cell_Method(models.Model):
     class Meta:
         app_label = "db"
-
-    id = models.AutoField(primary_key=True)
-    name = models.CharField(max_length=64)
-
-class TimeDomain(models.Model):
-
-    class Meta:
-        app_label="db"
-
-    interval =  models.PositiveIntegerField()
-    interval_units = models.CharField(max_length=3,default='d')
-    units = models.CharField(max_length=12,default='days')
-    calendar = models.CharField(max_length=12, default="standard")
-    starting = models.FloatField()
-    ending = models.FloatField()
-    
-    def resolution(self):
-        return f'{self.interval} {self.units}'
-    
+    method = models.CharField(max_length=256)
+    axis = models.CharField(max_length=64)
     def __str__(self):
-        return f'{self.interval} ({self.units}) from {self.starting} to {self.ending}'
+        return f"{self.axis} : {self.method}"
 
+class Cell_MethodSet(models.Model):
+    """ 
+    A hash table to make cell method searches efficient when needed
+    for variable identity matching. THe other option of directly
+    linking cell method make creating new variables very inefficient.
+    """
+    class Meta:
+        app_label = "db"
+    methods = models.ManyToManyField(Cell_Method)
+    key = models.CharField(max_length=64, unique=True)
+    def __str__(self):
+        return ','.join([str(m) for m in self.methods.all()])
+
+    @staticmethod
+    def generate_key(methods):
+        """Generate a unique key (e.g., hash) for a list of method ids."""
+        method_ids = sorted([str(method.id) for method in methods])  # Sort to avoid ordering issues
+        key_string = ",".join(method_ids)  # Create a string with sorted method ids
+        return hashlib.md5(key_string.encode('utf-8')).hexdigest()  # Create an MD5 hash
+
+    @classmethod
+    def get_or_create_from_methods(cls, methods):
+        """Retrieve or create a Cell_MethodSet based on the list of methods."""
+        key = cls.generate_key(methods)
+        method_set, created = cls.objects.get_or_create(key=key)
+        if created:
+            method_set.methods.set(methods)  # Set methods if it's a new Cell_MethodSet
+        return method_set
 
 class VariablePropertyKeys(models.TextChoices):
     """ 

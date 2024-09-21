@@ -20,10 +20,10 @@ class Posix:
         self.db = db
         self.location = location
         try:
-            loc = self.db.location_retrieve(location)
+            loc = self.db.location.retrieve(location)
             logger.info(f"Using existing location ({loc})")
         except ValueError:
-            loc = self.db.location_create(location)
+            loc = self.db.location.create(location)
             logger.info(f"Using new location ({loc})")
 
     def add_collection(
@@ -56,11 +56,11 @@ class Posix:
         """
         # Require a unique collection name here
         try:
-            c = self.db.collection_retrieve(collection_name)
+            c = self.db.collection.retrieve_by_name(collection_name)
             raise ValueError(f'Cannot add {collection_name} - it already exists')
         except:
-            c = self.db.collection_create(collection_name, collection_description)
-            self.db.collection_type_add(c,'_type',intent)
+            c = self.db.collection.create(name=collection_name, description=collection_description)
+            self.db.collection.add_type(c,'_type',intent)
 
         args = [
             path_to_collection_head,
