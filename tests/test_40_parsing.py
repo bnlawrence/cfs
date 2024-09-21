@@ -84,26 +84,35 @@ def test_field_parsing(inputfield):
 
 def test_upload_parsed_dict(inputfield, test_db):
     """ Can we sensibly upload a variable from this parsed dictionary?"""
-    file_properties ={'name':'test_file_1','path':'/nowhere/','size':10}
-    l = test_db.location_create('parloc')
-    c = test_db.collection_create('parcol')
-    f = test_db.upload_file_to_collection(l.name, c.name, file_properties)
+
+    print('Known domains',test_db.xydomain.all())
+    file_properties ={'name':'test_file_1','path':'/nowhere/','size':10,'location':'parloc'}
+
+    l = test_db.location.create('parloc')
+    c = test_db.collection.create(name='parcol')
+ 
     adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_xy=None)[0]
-    adict['in_file'] = f
     adict['identity'] = 'special test var'
-    v0=test_db.variable_retrieve_or_make(adict)
+    
+    filedata={'properties':file_properties, 'variables':[adict,]}
+    test_db.upload_file_to_collection(l.name, c.name, filedata)
+  
+
+def test_cleanup(test_db):
+
+
     with pytest.raises(ValueError):
        # this should fail because we can't do a retrieve or make without enough info to do a make!
-       v1 = test_db.variable_retrieve_or_make({'identity':'special test var'})
-    v1 = test_db.variables_retrieve_by_properties({'identity':'special test var'})[0]
+       v1 = test_db.variable.get_or_create({'identity':'special test var'})
+    v1 = test_db.variable.retrieve_by_properties({'identity':'special test var'})[0]
     # Tests are not necessarily isolated, so for now, let's just delete the things
     # that intefere with other tests from other files.
     
     d1 = v1.spatial_domain.name
     v1.delete()
-    d2 = test_db.domain_retrieve_by_name(d1)
+    d2 = test_db.xydomain.retrieve_by_name(d1)
     assert d2 is None, 'Variable delete failed to delete the spatial domain used for parsing'
-    d = test_db.domains_all()
-    assert len(d)==0,'parsing cleanup not complete'
+    d = test_db.xydomain.count()
+    assert d==0,'parsing cleanup not complete'
   
 

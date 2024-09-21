@@ -22,10 +22,10 @@ def test_mixin(tmp_path, request):
 
     db = CollectionDB()
 
-    f1 = db.file.create(**prop1)
-    f2 = db.file.create(**prop2)
+    f1 = db.file.create(prop1)
+    f2 = db.file.create(prop2)
 
-    f3,created = db.file.get_or_create(**prop1)
+    f3,created = db.file.get_or_create(prop1)
     assert str(f3) == str(f1)
     assert created == False
 

@@ -47,7 +47,7 @@ def test_data():
     from core.db.interface import CollectionDB
     cdb = CollectionDB()
     col = cdb.collection.create(name='Holding')
-    file = cdb.file.create(**FILE_PROPERTIES)
+    file = cdb.file.create(FILE_PROPERTIES)
     return cdb, file, col
 
 def test_simple_variable(test_data):
@@ -168,5 +168,19 @@ def test_deletion(test_data):
         v.delete()
     spatial = test_db.xydomain.retrieve_by_name('AnotherDomain')
     assert spatial is None, 'Failed to delete spatial domain as variable was deleted'
+
+def test_cleanup(test_data):
+    """ Should be deleting all this stuff that depends on these variables"""
+
+    test_db, f, c = test_data
+
+    for v in test_db.variable.all():
+        v.delete()
+    
+    assert test_db.variable.count() == 0
+    assert test_db.xydomain.count() == 0
+    assert test_db.tdomain.count() == 0
+
+
 
     

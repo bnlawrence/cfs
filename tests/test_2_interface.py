@@ -61,7 +61,7 @@ def test_fileupload(test_db):
     loc=test_db.location.create('testing')
     files = [{'path': '/somewhere/in/unix_land', 'name': f'filet{i}', 'size': 10,'location':loc} for i in range(10)]
     for f in files:
-        test_db.file.create(**f)
+        test_db.file.create(f)
 
 def test_add_and_retrieve_tag(test_db):
     """

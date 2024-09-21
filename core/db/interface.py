@@ -393,8 +393,9 @@ class FileInterface(GenericHandler):
         files = File.objects.filter(variable__in=variables)
         return files
     
-    def create(self, **properties):
+    def create(self, props):
 
+        properties = props.copy()
         properties, location = self._doloc(properties)
         file = super().create(**properties)
         file.locations.add(location)
@@ -402,7 +403,8 @@ class FileInterface(GenericHandler):
         location.save()
         return file
     
-    def get_or_create(self, **properties):
+    def get_or_create(self, props):
+        properties = props.copy()
         properties, location = self._doloc(properties)
         file, created = super().get_or_create(**properties)
         if not created and location in file.locations.all():
@@ -684,11 +686,13 @@ class VariableInterface(GenericHandler):
         variables = Variable.objects.filter(in_collection__in=collection)
         return variables
     
-    def get_or_create(self, varprops):
+    def get_or_create(self, varprops, unique=True):
         """
         If there is a variable corresponding to varprops with the same full set of properties, 
         return it, otherwise create it. Varprops should be a dictionary which includes at least 
-        an identiy and an atomic origin in the key properties
+        an identiy and an atomic origin in the key properties.
+        In general we should not doing a retrieve when we want to create, hence the default
+        value of unique.
         """
 
         props = self._construct_properties(varprops)
@@ -699,8 +703,9 @@ class VariableInterface(GenericHandler):
             raise ValueError('Insufficient properties to create a variable')
         args = [props[k] for k in ['_proxied','key_properties','spatial_domain',
                                    'time_domain','cell_methods','in_file']]
-        print(args)
         var, created = Variable.get_or_create_unique_instance(*args)
+        if unique and not created:
+            raise PermissionError('Attempt to re-create existing variable {var}')
         return var
     
     def all(self):
@@ -810,8 +815,8 @@ class CollectionDB:
         """
 
         try:
-            c = self.collection.get(name=collection_name)
-            loc = self.location.get(name=location_name)
+            c = self.collection.retrieve_by_name(collection_name)
+            loc = self.location.retrieve(location_name)
         except Collection.DoesNotExist:
             raise ValueError("Collection not yet available in database")
         except Location.DoesNotExist:
@@ -825,7 +830,8 @@ class CollectionDB:
             created.append(file)
             manifests={}
             step = 1
-            for manifest in filedata['manifests']:
+            manidata = filedata.pop('manifests',[])
+            for manifest in manidata:
                 key = manifest.pop('manikey')
                 manifests[key] = self.manifest.create(manifest)
                 created.append(manifests[key])
@@ -835,14 +841,14 @@ class CollectionDB:
                 if key is not None:
                     v['in_manifest'] = manifests[key]
                 v['in_file'] = file
-                var = self.variable.create(v)
+                var = self.variable.get_or_create(v)
                 created.append(var)
         except Exception as e:
             # roll back
             items = len(created)
             for c in reversed(created):
                 c.delete()
-            logger.fatal('Failure encountered at step {step}, {items} items deleted. Problem was:')
+            logger.fatal(f'Failure encountered at step {step}, {items} items deleted. Problem was:')
             match step:
                 case 0:
                     logger.fatal(filedata['properties'])
@@ -851,5 +857,5 @@ class CollectionDB:
                 case 2:
                     logger.fatal(v)
 
-            msg = str(e)+f'(Failed after step {step}, {items} items deleted)'
+            msg = str(e)+f' (Failed after step {step}, {items} items deleted)'
             raise Exception(msg)
