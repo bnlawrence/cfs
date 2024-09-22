@@ -192,20 +192,19 @@ def parse_fields_todict(fields, temporal_resolution=None, lookup_xy=None, cfa=Fa
                 each of the cf fields (a subset of the variables) found in the file.
     """
     descriptions = []
-    # loop over fields in file (not the same as netcdf variables)
-    if cfa:
-        cfahandler=CFAhandler(len(fields))
-
+   
+    # tools for handling domains and manifests
+    cfahandler=CFAhandler(len(fields))
     if lookup_xy is None:
             lookup_xy=LookupXY
-
     lookup_t = LookupT()
 
+     # loop over fields in file (not the same as netcdf variables)
     for v in fields:
         t1 = time()
         description = {'atomic_origin': parse2atomic_name(v), 'identity':v.identity()}
         if cfa:
-            description['cfa'] = cfahandler.parse_fragment_info(v)
+            description['manikey'] = cfahandler.parse_field_to_manifest(v)
         properties = v.properties()
         for k in ['standard_name','long_name','realm']:
             description[k] = v.get_property(k,None)
@@ -226,7 +225,7 @@ def parse_fields_todict(fields, temporal_resolution=None, lookup_xy=None, cfa=Fa
         descriptions.append(description)
         t5 = time()
         logger.info(f'Parsing steps {t2-t1:.2f},{t3-t2:.2f},{t4-t3:.2f},{t5-t4:.2f} seconds')
-    return descriptions
+    return descriptions, cfahandler.known_manifests
 
 
 

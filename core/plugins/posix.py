@@ -111,13 +111,13 @@ class Posix:
             collections = f['collections']
             for sc in collections:
                 try:
-                    cc = self.db.collection_retrieve(str(sc))
+                    cc = self.db.collection.retrieve_by_name(str(sc))
                 except ValueError:
-                    cc = self.db.collection_create(str(sc), description="Subdirectory of collection {c}")
+                    cc = self.db.collection.create(name=str(sc), description="Subdirectory of collection {c}")
                     pd = str(Path(sc).parent)
                     #print(f'Created {cc} with parent {pd}')
                     #ppd = self.db.collection_retrieve(pd)
-                    self.db.relationships_add(pd,cc.name,'parent_of','subdir_of')
+                    self.db.relationship.add_single(pd,cc.name,'parent_of','subdir_of')
         logger.info('Before call')
         msg = cfupload_ncfiles(self.db, self.location, c, dbfiles, intent, cfa=cfa)
         logger.info(msg)
@@ -157,6 +157,18 @@ class PosixAccessor:
     """
     def  __init__(self, checksum_method=None):
         self.checksum_method = checksum_method
-        self.known_
+        if self.checksum_method is not None:
+            raise NotImplementedError('No support yet for checksums in PosixAccessor')
+        self.known_files={}
     def get(self, path):
-        pass
+        if path in self.known_files:
+            return self.known_files[path]
+        else:
+            p = Path(path)
+            try:
+                s = p.stat().st_size
+                self.known_files[path]=s
+                return s
+            except:
+                #FIXME: error handling in posix accessor
+                raise 

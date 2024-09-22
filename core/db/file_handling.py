@@ -4,13 +4,14 @@ logger = logging.getLogger(__name__)
 import cf
 
 from core.db.cfparsing import parse_fields_todict
-from core.db.models import File, Location, Collection
+from core.db.interface import LocationInterface
 
-def cfupload_variables(db, file, collection, extra_collections, cfa=False):
+def cfupload_variables(db, location, fd, collection, extra_collections, cfa=False):
     """
     Parse a file and load cf metadata into the database.
     : db : a CollectionDB instance
-    : file : a db file instance
+    : location :  a location name
+    : file : a file description dictionary
     : collection : a db collection name
     : extra_collections : names of any extra collections in which these files and variables might appear
     : returns : tuple (status message, time taken in seconds)
@@ -25,27 +26,22 @@ def cfupload_variables(db, file, collection, extra_collections, cfa=False):
     logger.setLevel(logging.DEBUG) 
 
     logger.info('Here now')
-    if not isinstance(file, File):
-        raise ValueError(f'cfupload_file needs a File instance not a {file.__class__}')
     t1 = time()
-    fields = cf.read(file.path)
+    fields = cf.read(fd['path'])
     t2 = time()
-    logger.info(f'Initial CF read of {file.name} took {t2-t1:.2f}s')
+    logger.info(f"Initial CF read of {fd['name']} took {t2-t1:.2f}s")
     logger.warning('Limiting field parsing to ten items, remove restriction in production')
-    descriptions = parse_fields_todict(fields[0:10], cfa=cfa)
+    descriptions, manifests = parse_fields_todict(fields[0:10], cfa=cfa)
     t2b = time()-t2
     logger.info(f'Parsing to dictionary took {t2b:.2f}s')
-    for d in descriptions:
-        d['in_file'] = file
-        if 'cfa' in d:
-            cfa = d.pop('cfa')
-        v = db.variable_retrieve_or_make(d)
-        db.variable_add_to_collection(collection, v)
-        for c in extra_collections:
-             db.variable_add_to_collection(c, v)
-        if cfa:
-            cfa['cfa_file'] = file
-            db.manifest_add(cfa)
+
+    filedata = {'properties':fd, 
+                'variables':descriptions}
+    if cfa:
+        filedata['manifests'] = manifests
+
+    db.upload_file_to_collection(location, collection, filedata)
+
     t3 = time()-t1
     return f'cfupload_file: {len(descriptions)} uploaded in {t2:.2f}s',len(descriptions),t2
 
@@ -72,15 +68,17 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=F
     nv = 0
     nf = 0 
     t1 = time()
+    loci = LocationInterface()
+    loc = loci.get_or_create(location_name)
     for fd in dbfiles:
         try:
             collections = fd.pop('collections')
         except KeyError:
             collections = []
         fd['type']=intent
+        fd['location']=loc
         logger.info('Handling {fd}')
-        file = db.upload_file_to_collection(location_name, base_collection.name, fd, lazy=1, update=False)
-        m, n, t = cfupload_variables(db, file, base_collection.name, collections, cfa=cfa)
+        m, n, t = cfupload_variables(db, location_name, fd, base_collection.name, collections, cfa=cfa)
         msgs.append(m)
         nv += n
         t += n

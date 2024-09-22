@@ -437,6 +437,9 @@ class LocationInterface(GenericHandler):
         instance = self.retrieve(name)
         instance.delete()
 
+    def get_or_create(self,name):
+        return super().get_or_create(name=name)
+
 
 class ManifestInterface(GenericHandler):
     def __init__(self):
@@ -448,18 +451,19 @@ class ManifestInterface(GenericHandler):
         This should always be unique.
         Can be deleted by deleting the parent file.
         """
+        print(properties)
         if 'cells' in properties:
             cells = properties.pop('cells')
             logger.info(f'Removed cells {cells} from manifest, why did we want them?')
         # parse fragment file dictionaries into proper files
         fragments = properties.pop('fragments')
-        print("manifest properties", properties)
+        properties.pop('_bounds_ncvar')  #not intended for the database
         with transaction.atomic():
             # we do this directly for efficiency, and to bypass
             # the interface file check on size, which we may not know
             # for fragment files.
             m = Manifest.objects.create(**properties)
-            file_objects = [File(**f) for f in fragments]
+            file_objects = [File(**f) for k,f in fragments.items()]
             File.objects.bulk_create(file_objects)
             m.fragments.add(*file_objects)
             # no saves needed, all done by the transaction
@@ -831,11 +835,14 @@ class CollectionDB:
             manifests={}
             step = 1
             manidata = filedata.pop('manifests',[])
-            for manifest in manidata:
-                key = manifest.pop('manikey')
-                manifests[key] = self.manifest.create(manifest)
+            for key,value in manidata.items():
+                manifest = value.pop('manikey')
+                value['cfa_file'] = file
+                step = 2
+                manifests[key] = self.manifest.add(value)
                 created.append(manifests[key])
-            step = 2
+            step = 3
+            vars = []
             for v in filedata['variables']:
                 key = v.pop('manikey',None)
                 if key is not None:
@@ -843,7 +850,12 @@ class CollectionDB:
                 v['in_file'] = file
                 var = self.variable.get_or_create(v)
                 created.append(var)
-        except Exception as e:
+                vars.append(var)
+            step = 4
+            for v in vars:
+                self.variable.add_to_collection(c.name,v)
+        
+        except ExceptionGroup as e:
             # roll back
             items = len(created)
             for c in reversed(created):
@@ -853,9 +865,13 @@ class CollectionDB:
                 case 0:
                     logger.fatal(filedata['properties'])
                 case 1:
-                    logger.fatal(filedata['manifest'])
+                    logger.fatal(manidata)
                 case 2:
+                    logger.fatal(manifests[key])
+                case 3:
                     logger.fatal(v)
+                case 4:
+                    logger.fatal(f'Problem with adding to collection {c}')
 
             msg = str(e)+f' (Failed after step {step}, {items} items deleted)'
             raise Exception(msg)

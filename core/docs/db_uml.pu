@@ -36,6 +36,11 @@ db.Collection o--o db.Tag
 db.Collection o--o db.Variable
 
 
+class db.Batch #e4f4d6 {
+    + id (BigAutoField)
+}
+
+
 class db.Domain #e4f4d6 {
     - id (AutoField)
     + name (CharField)
@@ -56,12 +61,14 @@ class db.File #e4f4d6 {
     + path (CharField)
     + size (PositiveIntegerField)
     + type (CharField)
+    ~ in_batch (ForeignKey)
     + checksum (CharField)
     + checksum_method (CharField)
     + uuid (UUIDField)
     + format (CharField)
     # locations (ManyToManyField)
 }
+db.File o--> db.Batch
 db.File o--o db.Location
 db.File .- db.File_type
 
@@ -80,6 +87,7 @@ class db.Manifest #e4f4d6 {
     + units (CharField)
     + calendar (CharField)
     + total_size (PositiveBigIntegerField)
+    + parent_uuid (UUIDField)
     # fragments (ManyToManyField)
 }
 db.Manifest <--* db.File

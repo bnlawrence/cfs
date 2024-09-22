@@ -85,7 +85,7 @@ class Collection(models.Model):
         del self._proxied[key]
 
     def __str__(self):
-        return f"{self.name} (v{self.variables.count()},f{self.n_files},{sizeof_fmt(self.volume)})"
+        return f"{self.name} (v{self.variables.count()})"
 
     _proxied = models.JSONField()
     name = models.CharField(max_length=256, unique=True)
@@ -94,7 +94,7 @@ class Collection(models.Model):
     type = models.ManyToManyField(CollectionType)
     tags = models.ManyToManyField("Tag")
     variables = models.ManyToManyField("Variable")
-
+    
 
 class Domain(models.Model):
     """ 
@@ -269,6 +269,7 @@ class Manifest(models.Model):
     units = models.CharField(max_length=20)
     calendar = models.CharField(max_length=20)
     total_size = models.PositiveBigIntegerField(null=True)
+    parent_uuid = models.UUIDField(null=True)
 
 
 class Relationship(models.Model):
