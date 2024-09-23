@@ -152,11 +152,13 @@ class CollectionInterface(GenericHandler):
         """
         self.model.variables.add(variable)
 
-    def delete(self, collection, force=False, unique_only=True):
+    def delete(self, collection, force=False):
         """
         Delete any related variables.
         """
-        collection.do_empty(force, unique_only)
+        if isinstance(collection, str):
+            collection = self.retrieve_by_name(collection)
+        collection.do_empty(force)
         collection.delete()
 
     
@@ -187,7 +189,7 @@ class CollectionInterface(GenericHandler):
         return Collection.objects.all()
     
         
-    def collection_delete_subdirs(self, collection, self_destruct=False):
+    def delete_subdirs(self, collection, self_destruct=False):
         """ 
         This deletes all the subdirectories of a specific collection,
         that is, all the collections which hold variables which are 
@@ -199,16 +201,14 @@ class CollectionInterface(GenericHandler):
         if child_relationships:
             for relation in child_relationships:
                 child = relation.related_to
-                removed += self.collection_delete_subdirs(child, self_destruct=True)
+                removed += self.delete_subdirs(child, self_destruct=True)
         if self_destruct:
-            if collection.n_files!=0:
-                raise PermissionError('Sub directory {c} contains files. Cannot delete')
             collection.delete()
             return removed+1
         else:
             return removed
 
-    def collection_find_all_with_variable(self, variable):
+    def findall_with_variable(self, variable):
         """Find all collections with a given variable"""
         coldict = {}
         for file in variable.in_files.all():
@@ -219,25 +219,6 @@ class CollectionInterface(GenericHandler):
                     coldict[collection] += 1
         return coldict
 
-    def collection_generate(self, replacedb, col):
-        """Function to help generate collections"""
-        vars = self.retrieve_variables_in_collection(col)
-        for v in vars:
-            for memberid, replace in replacedb.items():
-                files = v.in_files.distinct()
-                newvar = self.clone(v)
-                for file in files:
-                    newfile = self.retrieve_or_make_file(
-                        match=os.path.basename(
-                            file.name.replace("cn134", replace[0]).replace(
-                                "999", replace[1][1]
-                            )
-                        )
-                    ).last()
-                    newvar.in_files.remove(file)
-                    newvar.in_files.add(newfile)
-                    col.files.add(newfile)
-                    newfile.save()
 
     def add_type(self, collection, key, value):
         """ 
@@ -857,6 +838,7 @@ class CollectionDB:
             step = 4
             for v in vars:
                 self.variable.add_to_collection(c.name,v)
+            return vars
         
         except ExceptionGroup as e:
             # roll back

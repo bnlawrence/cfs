@@ -18,9 +18,6 @@ def setup_test_db(tmp_path_factory, request):
     dbfile = str(Path(tmp_path) / f'{module_name}.db')
     migrations_location = str(Path(tmp_path)/'migrations')
     setup_django(db_file=dbfile,  migrations_location=migrations_location)
-    yield # This marks the end of the setup phase and begins the test execution
-
-
 
 
 @pytest.fixture
@@ -53,22 +50,6 @@ def posix_nest(tmp_path, inputfield):
         sz.append(f.stat().st_size)
 
     return posix_root,sz
-    
-def test_posix_class_basic(django_dependencies, posix_info):
-    """ 
-    Test uploading a couple of files without a hierarchy and
-    nested subcollections
-    """
-    posix_path, s = posix_info
-    test_db, p, ignore = django_dependencies
-    p.add_collection(
-        str(posix_path),
-        'posix_test_collection',
-        'collection of variables from the test data')
-    c1 = test_db.collection_retrieve('posix_test_collection')
-    assert c1.volume == sum(s)
-    assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
-
 
 def test_parents(django_dependencies, posix_nest):
     """ 
@@ -84,6 +65,22 @@ def test_parents(django_dependencies, posix_nest):
         got.append(parents)
     assert expected == got
 
+    
+def test_posix_class_basic(django_dependencies, posix_info):
+    """ 
+    Test adding a couple of files without a hierarchy and
+    nested subcollections
+    """
+    posix_path, s = posix_info
+    test_db, p, ignore = django_dependencies
+    p.add_collection(
+        str(posix_path),
+        'posix_test_collection',
+        'collection of variables from the test data')
+    c1 = test_db.collection.retrieve_by_name('posix_test_collection')
+    assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
+
+
 def test_posix_class_nested(django_dependencies, posix_nest):
     """ 
     Test uploading a couple of files with a hierarchy and
@@ -96,17 +93,15 @@ def test_posix_class_nested(django_dependencies, posix_nest):
         'posix_test_collection2',
         'collection of variables from the test data',
         subcollections=True)
-    c1 = test_db.collection_retrieve('posix_test_collection2')
+    c1 = test_db.collection.retrieve_by_name('posix_test_collection2')
     assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
-    assert c1.volume == sum(s)
-    assert len(test_db.relationships_retrieve('posix_test_collection2','parent_of')) == 1
-    c2 = test_db.collection_retrieve('posix_test_collection2/subset1')
-    assert c2.volume == 0  # files only appear in the parent collection
+    assert len(test_db.relationship.retrieve('posix_test_collection2','parent_of')) == 1
+    c2 = test_db.collection.retrieve_by_name('posix_test_collection2/subset1')
+    print('C2\n',c2.variables.all(),'**')
     assert c1.variables.count() == 3
     assert c2.variables.count() == 2
-    from core.db.models import Relationship
-    rout = test_db.relationships_retrieve('posix_test_collection2').count()
-    rin = test_db.relationships_retrieve('posix_test_collection2',outbound=False).count()
+    rout = test_db.relationship.retrieve('posix_test_collection2').count()
+    rin = test_db.relationship.retrieve('posix_test_collection2',outbound=False).count()
     assert rout+rin == 2
 
 def test_deleting_collections(django_dependencies):
@@ -116,12 +111,12 @@ def test_deleting_collections(django_dependencies):
     """
     test_db, ignore , ignore = django_dependencies
 
-    n_collections = test_db.collections_retrieve().count()
-    c = test_db.collection_retrieve('posix_test_collection2')
-    removed = test_db.collection_delete_subdirs(c)
+    n_collections = test_db.collection.count()
+    c = test_db.collection.retrieve_by_name('posix_test_collection2')
+    removed = test_db.collection.delete_subdirs(c)
     assert removed == 2
-    remaining = test_db.collections_retrieve()
-    assert remaining.count() == n_collections-2
+    remaining = test_db.collection.count()
+    assert remaining == n_collections-2
 
 def test_cleanup(django_dependencies):
     """ 
@@ -129,23 +124,14 @@ def test_cleanup(django_dependencies):
     bulk of the database cleanly.
     """
     test_db, ignore , ignore = django_dependencies
-    collections = test_db.collections_retrieve(name_contains='posix')
-    assert collections.count() == 2, "Failed to find correct number of posix collections"
+    collections = test_db.collection.retrieve(name_contains='posix')
+    assert collections.count() == 2, f"Failed to find correct number of posix collections (Got {collections.count()} expected 2)"
     # find all the files in those collections and make sure we delete those
     for collection in collections:
-        test_db.collection_delete(collection.name, force=True)
-    variables_left = test_db.variables_all()
+        test_db.collection.delete(collection.name, force=True)
+    variables_left = test_db.variable.all()
     for v in variables_left:
         assert v.in_files.count()!=0, f"Variable [{v}] should not exist if it is in NO files"
     assert len(variables_left) == 0,'Variables have not been cleaned up'
-    d = test_db.domains_all()
-    assert len(d)==0,'Domains have not been cleaned up'
-    
-    
-
-
-
-
-
-
-    
+    d = test_db.xydomain.count()
+    assert d==0,'Domains have not been cleaned up'

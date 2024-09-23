@@ -117,7 +117,7 @@ class Posix:
                     pd = str(Path(sc).parent)
                     #print(f'Created {cc} with parent {pd}')
                     #ppd = self.db.collection_retrieve(pd)
-                    self.db.relationship.add_single(pd,cc.name,'parent_of','subdir_of')
+                    self.db.relationship.add_double(pd,cc.name,'parent_of','subdir_of')
         logger.info('Before call')
         msg = cfupload_ncfiles(self.db, self.location, c, dbfiles, intent, cfa=cfa)
         logger.info(msg)

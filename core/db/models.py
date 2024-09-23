@@ -116,7 +116,7 @@ class Collection(models.Model):
         unique_vars = self.unique_variables()
         nunique = unique_vars.count()
         if nunique > 0 and not force:
-            raise PermissionError('Cannot empty collection {c} with unique variables with force=False')
+            raise PermissionError(f'Cannot empty collection {self} with unique variables with force=False')
         for v in self.variables.all():
             v.delete()
 
@@ -126,7 +126,7 @@ class Collection(models.Model):
         print('deletion begins')
         print(self.unique_variables())
         if self.unique_variables().count() > 0:
-            raise PermissionError('Cannot delete collection {c} with unique variables')
+            raise PermissionError(f'Cannot delete collection {self} with unique variables')
         super().delete(*args,**kwargs)
     
 

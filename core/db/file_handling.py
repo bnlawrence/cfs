@@ -40,7 +40,10 @@ def cfupload_variables(db, location, fd, collection, extra_collections, cfa=Fals
     if cfa:
         filedata['manifests'] = manifests
 
-    db.upload_file_to_collection(location, collection, filedata)
+    vars = db.upload_file_to_collection(location, collection, filedata)
+    for ec in extra_collections:
+        for v in vars:
+            db.variable.add_to_collection(ec,v)
 
     t3 = time()-t1
     return f'cfupload_file: {len(descriptions)} uploaded in {t2:.2f}s',len(descriptions),t2
