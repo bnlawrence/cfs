@@ -58,6 +58,7 @@ def test_simple_variable(test_data):
     assert var.get_kp('identity') == 'test var 1'
     loc = test_db.location.retrieve('varloc')
     assert loc.volume == FILE_PROPERTIES['size']
+    print(var.dump())
     
 
 def test_keys_with_same_value(test_data):

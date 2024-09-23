@@ -16,16 +16,7 @@ def cfupload_variables(db, location, fd, collection, extra_collections, cfa=Fals
     : extra_collections : names of any extra collections in which these files and variables might appear
     : returns : tuple (status message, time taken in seconds)
     """
-
-    print('logger_name', __name__, logger)
-    print('logging global',logging.getLogger().level)
-    print("Logger name:", logger.name)
-    print("Logger level:", logger.level)
-    print("Handlers:", logger.handlers)
     
-    logger.setLevel(logging.DEBUG) 
-
-    logger.info('Here now')
     t1 = time()
     fields = cf.read(fd['path'])
     t2 = time()
@@ -45,8 +36,8 @@ def cfupload_variables(db, location, fd, collection, extra_collections, cfa=Fals
         for v in vars:
             db.variable.add_to_collection(ec,v)
 
-    t3 = time()-t1
-    return f'cfupload_file: {len(descriptions)} uploaded in {t2:.2f}s',len(descriptions),t2
+    t3 = time()
+    return f'cfupload_file: {len(descriptions)} uploaded in {t3-t1:.2f}s',len(descriptions),t3-t2
 
 
 def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=False, accessor=None):
@@ -87,7 +78,7 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=F
         t += n
         nf += 1
     t2 = time()-t1
-    msg = f'cfupload_ncfiles uploaded {nf} files ({nv} variables) which took {t2:.2}({t:.2})s'
+    msg = f'cfupload_ncfiles uploaded {nf} files ({nv} variables) which took {t2:.2f}({t:.2f})s'
     logger.info(msg)
     return msg
 

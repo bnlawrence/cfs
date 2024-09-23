@@ -154,7 +154,7 @@ class CFAhandler:
                     new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
                    
                 # th other option is that we've got no bounds, the boundless manifest is what we want.
-                self._add_known_and_exit(new_manifest,field)
+                return self._add_known_and_exit(new_manifest,field)
                
         # ok, carry on, we're constructing it from scratch
         new_manifest = CFAManifest(accessor=self.accessor)
@@ -162,7 +162,7 @@ class CFAhandler:
             new_manifest.add_fragment(f)
         bounds = self._parse_bounds_from_field(field, tdim)
         new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
-        self._add_known_and_exit(new_manifest, field)
+        return self._add_known_and_exit(new_manifest, field)
 
     def _add_known_and_exit(self, manifest, field):
         """ 

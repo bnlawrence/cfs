@@ -48,6 +48,11 @@ def test_collection_create(test_db):
     assert info.name == 'mrun1'
     assert info.description == '(none)'
 
+def test_delete_empty_collection(test_db):
+    info = test_db.collection.create(name='death becomes her')
+    test_db.collection.delete(info)
+
+
 def test_unique_collection(test_db):
     kw = {'resolution': 'N512', 'workspace': 'testws'}
     test_db.collection.create('mrun2', '(none)', kw)

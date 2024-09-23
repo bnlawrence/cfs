@@ -424,7 +424,7 @@ class LocationInterface(GenericHandler):
 
 class ManifestInterface(GenericHandler):
     def __init__(self):
-        super().__init__(Location)
+        super().__init__(Manifest)
 
     def add(self, properties):
         """
@@ -432,7 +432,7 @@ class ManifestInterface(GenericHandler):
         This should always be unique.
         Can be deleted by deleting the parent file.
         """
-        print(properties)
+        print('Adding manifest')
         if 'cells' in properties:
             cells = properties.pop('cells')
             logger.info(f'Removed cells {cells} from manifest, why did we want them?')
@@ -448,6 +448,7 @@ class ManifestInterface(GenericHandler):
             File.objects.bulk_create(file_objects)
             m.fragments.add(*file_objects)
             # no saves needed, all done by the transaction
+        return m
 
     def get_or_create(self):
         """ We do not want to allow access to the superclass method"""
@@ -582,14 +583,15 @@ class VariableInterface(GenericHandler):
             elif key == 'cell_methods':
                 method_set = self.cellm.set_get_or_create(varprops[key])
                 definition[key]=method_set
-            elif key == 'in_file':
+            elif key in ['in_file','in_manifest']:
                 definition[key]=varprops[key]
             else:
                 extras[key]=varprops[key]
         if not ignore_proxy:
             definition['_proxied']=extras
-        if 'cell_methods' not in definition:
-            definition['cell_methods'] = None
+        for x in ['cell_methods','in_manifest']:
+            if x not in definition:
+                definition[x] = None
         return definition
     
     def add_to_collection(self, collection, variable):
@@ -621,6 +623,7 @@ class VariableInterface(GenericHandler):
                    'spatial_domain ' : a db (spatial) domain instance
                    'time_domain' :  a db time domain instance
                    'in_file': a db file instance
+                   'in_manifest': a db manifest instance
         """
         if from_collection is None:
              base = Variable.objects
@@ -636,8 +639,10 @@ class VariableInterface(GenericHandler):
                 base = base.filter(key_properties=value)
             elif key in ["spatial_domain","temporal_domain"]:
                 base = base.filter(**{key:value})
-            elif key in ['in_file']:
+            elif key == 'in_file':
                 base = base.filter(in_file=value)
+            elif key == 'in_manifest':
+                base = base.filter(in_manifest=value)
             elif key == "cell_methods":
                 base = base.filter(cell_methods__methods=value)
             elif key == 'temporal_resolution':
@@ -687,10 +692,10 @@ class VariableInterface(GenericHandler):
         kp = [p.key for p in props['key_properties']]
         if 'ID' not in kp:
             raise ValueError('Variable definitions must include identity')
-        if len(props)!= 6:
+        if len(props)!= 7:
             raise ValueError('Insufficient properties to create a variable')
         args = [props[k] for k in ['_proxied','key_properties','spatial_domain',
-                                   'time_domain','cell_methods','in_file']]
+                                   'time_domain','cell_methods','in_file','in_manifest']]
         var, created = Variable.get_or_create_unique_instance(*args)
         if unique and not created:
             raise PermissionError('Attempt to re-create existing variable {var}')

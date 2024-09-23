@@ -1,5 +1,6 @@
 from pathlib import Path
 from core.db.cfa_tools import CFAhandler
+from core.db.cfparsing import parse_fields_todict
 
 import cf
 import numpy as np
@@ -60,7 +61,20 @@ def test_cfa_handler(cfa_only):
 
     assert len(c.known_manifests) == 1
 
-    for m in c.known_manifests:
-        print(c.known_manifests[m])
+def test_variable_manifest_linkage(cfa_only):
+    """ 
+    The manikey should link variables to manifests found in the cfa file
+    """
+    fields = cf.read(cfa_only.glob('*.cfa'))
+
+    descriptions, manifests = parse_fields_todict(fields[0:10], cfa=True)
+
+    vkey = descriptions[0].pop('manikey')
+    mkey = list(manifests.keys())[0]
+    assert vkey == mkey
+
+
+
+
     
 

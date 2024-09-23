@@ -1,6 +1,6 @@
 from pathlib import Path
 here = Path(__file__).parent.resolve()
-dbfile = here/'cananari_test.db'
+dbfile = here/'canari_test.db'
 migrations_location = str(here/'migrations')
 from core.db.standalone import setup_django
 setup_django(db_file=dbfile, migrations_location=migrations_location)
@@ -12,9 +12,9 @@ db = CollectionDB()
 def load(P, cname, restart=True):
     if restart:
         try:
-            existing = db.collection_retrieve(cname)
+            existing = db.collection.retrieve_by_name(cname)
             if existing:
-                db.collection_delete(existing.name, force=True)
+                db.collection.delete(existing.name, force=True)
         except ValueError:
             pass
         
@@ -27,9 +27,10 @@ def load(P, cname, restart=True):
 
 def show_vars():
 
-    vars = db.variables_retrieve_all()
+    vars = db.variable.all()
     for v in vars:
-        print(v)
+        print(v.dump())
+        print (v.in_manifest.fragments.all()[0])
 
 if __name__=="__main__":
     P = Posix(db,'cfs data dir')

@@ -104,6 +104,29 @@ def test_fragments(django_dependencies):
     assert len(files) == 1
 
 
+def test_manifest(django_dependencies):
+
+    test_db, ignore, ignore = django_dependencies
+    manifests = test_db.manifest.all()
+    assert test_db.manifest.count() == 1
+
+    assert manifests[0].fragments.count() == 3
+
+
+def test_variable(django_dependencies):
+
+    test_db, ignore, ignore = django_dependencies
+    v = test_db.variable.all()
+    assert len(v) == 1
+    v = v[0]
+    files = test_db.file.retrieve_all(type='C')
+    f = files[0]
+    assert v.in_file == f
+    m = test_db.manifest.all()[0]
+    assert v.in_manifest == m
+    
+
+
 def test_deletion(django_dependencies):
 
     test_db, ignore , ignore = django_dependencies

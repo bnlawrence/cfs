@@ -117,8 +117,9 @@ class Collection(models.Model):
         nunique = unique_vars.count()
         if nunique > 0 and not force:
             raise PermissionError(f'Cannot empty collection {self} with unique variables with force=False')
-        for v in self.variables.all():
-            v.delete()
+        if hasattr(self,'variables'):
+            for v in self.variables.all():
+                v.delete()
 
     def delete(self,*args,**kwargs):
         force = kwargs.pop('force',False)
@@ -326,6 +327,11 @@ class Manifest(models.Model):
             f.delete()
         super().delete(*args,**kwargs)
 
+    def __str__(self):
+        fcount = self.fragments.count()
+        return f'Manifest ({fcount} fragments from {self.cfa_file.name})'
+
+
 class Relationship(models.Model):
     class Meta:
         app_label = "db"
@@ -361,7 +367,7 @@ class TimeDomain(models.Model):
         return f'{self.interval} {self.units}'
     
     def __str__(self):
-        return f'{self.interval} ({self.units}) from {self.starting} to {self.ending}'
+        return f'From {self.starting} to {self.ending} ({self.units}, interval {self.interval})'
 
 
 class VariablePropertyKeys(models.TextChoices):
@@ -428,6 +434,15 @@ class Variable(models.Model):
     
     def __str__(self):
         return self.get_kp('identity')
+    
+    def dump(self):
+        s = f"\nField: {self.get_kp('identity')} ({self.get_kp('atomic_origin')})\n"
+        s+=f"  sn: {self.get_kp('standard_name')}; ln: {self.get_kp('long_name')}\n"
+        for x in ['cell_methods','spatial_domain','time_domain','in_file']:
+            value = getattr(self,x,None)
+            if value is not None:
+                s+= f'  {x}: {value}\n'
+        return s
 
     id = models.AutoField(primary_key=True)
     _proxied = models.JSONField()
@@ -486,7 +501,8 @@ class Variable(models.Model):
         self.key_properties.set(kp)   
 
     @classmethod
-    def get_or_create_unique_instance(cls, _proxied, key_properties, spatial_domain, time_domain, cell_methods, in_file):
+    def get_or_create_unique_instance(cls, _proxied, key_properties, spatial_domain, time_domain, cell_methods, 
+                                      in_file, in_manifest):
         """ Sadly repeats a lot of the save logic"""
         # Ensure that key_properties contains the required 'identity'
         keys = [k.key for k in key_properties]
@@ -500,6 +516,7 @@ class Variable(models.Model):
             time_domain=time_domain,
             cell_methods=cell_methods,
             in_file=in_file,
+            in_manifest=in_manifest,
         ).first()
 
         if existing_instance:
@@ -516,7 +533,8 @@ class Variable(models.Model):
             spatial_domain=spatial_domain,
             time_domain=time_domain,
             cell_methods=cell_methods,
-            in_file=in_file
+            in_file=in_file,
+            in_manifest=in_manifest
         )
 
         # Save the new instance with the key_properties passed as kwargs
