@@ -56,6 +56,8 @@ def test_simple_variable(test_data):
                   'spatial_domain':STD_DOMAIN_PROPERTIES, 'time_domain':STD_TEMPORAL,}
     var = test_db.variable.get_or_create(properties)
     assert var.get_kp('identity') == 'test var 1'
+    loc = test_db.location.retrieve('varloc')
+    assert loc.volume == FILE_PROPERTIES['size']
     
 
 def test_keys_with_same_value(test_data):
@@ -161,11 +163,22 @@ def test_deletion(test_data):
     test_db, f, c  = test_data
     spatial = test_db.xydomain.retrieve_by_name('AnotherDomain')
     vars = test_db.variable.retrieve_by_queries([('spatial_domain',spatial),])
+
+    loc = test_db.location.retrieve('varloc')
+    files = test_db.file.in_location('varloc')
+    for f in files: print(f)
+    assert loc.volume == sum([f.size for f in files])
+
     to_die = []
     count = len(vars)
     for v in vars:
         to_die.append(v.get_kp('identity'))
         v.delete()
+
+    loc = test_db.location.retrieve('varloc')
+    files = test_db.file.in_location('varloc')
+    assert loc.volume == sum([f.size for f in files])
+
     spatial = test_db.xydomain.retrieve_by_name('AnotherDomain')
     assert spatial is None, 'Failed to delete spatial domain as variable was deleted'
 
@@ -175,6 +188,8 @@ def test_cleanup(test_data):
     test_db, f, c = test_data
 
     for v in test_db.variable.all():
+        loc = test_db.location.retrieve('varloc')
+        #print(f'Deleting {v} which is in file {v.in_file} with {v.in_file.variable_set.count()}, {(loc.volume)}')
         v.delete()
     
     assert test_db.variable.count() == 0

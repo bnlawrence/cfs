@@ -25,6 +25,9 @@ def test_mixin(tmp_path, request):
     f1 = db.file.create(prop1)
     f2 = db.file.create(prop2)
 
+    loc = db.location.retrieve('init')
+    assert loc.volume==20
+
     f3,created = db.file.get_or_create(prop1)
     assert str(f3) == str(f1)
     assert created == False
@@ -40,7 +43,7 @@ def test_mixin(tmp_path, request):
 
     db.file.queryset_delete(files)
     loc = db.location.retrieve('init')
-    print(loc)
+    assert loc.volume == 0
 
     files = db.file.all()
     assert len(files) == 0

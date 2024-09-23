@@ -93,7 +93,41 @@ class Collection(models.Model):
     id = models.AutoField(primary_key=True)
     type = models.ManyToManyField(CollectionType)
     tags = models.ManyToManyField("Tag")
-    variables = models.ManyToManyField("Variable")
+    variables = models.ManyToManyField("Variable", related_name="contained_in")
+
+    def unique_variables(self):
+        """ 
+        Return a queryset containing all variables in this collection that
+        are only in this collection.
+        """
+        collection_count_subquery = Collection.objects.filter(
+                variables=OuterRef('pk')).values('variables').annotate(count=Count('id')).values('count')
+        vars = self.variables.annotate(collection_count=
+                                Subquery(collection_count_subquery)).filter(collection_count=1).all()
+        return vars
+
+    def do_empty(self, force=False):
+        """ 
+        Empty contents of collection so we can control all the implications for 
+        referenced variables and (from them) files.
+        : force : boolean - if true, force deletion of variables and files even
+        if this collection is the last one which references them.
+        """
+        unique_vars = self.unique_variables()
+        nunique = unique_vars.count()
+        if nunique > 0 and not force:
+            raise PermissionError('Cannot empty collection {c} with unique variables with force=False')
+        for v in self.variables.all():
+            v.delete()
+
+    def delete(self,*args,**kwargs):
+        force = kwargs.pop('force',False)
+        self.do_empty(force=force)
+        print('deletion begins')
+        print(self.unique_variables())
+        if self.unique_variables().count() > 0:
+            raise PermissionError('Cannot delete collection {c} with unique variables')
+        super().delete(*args,**kwargs)
     
 
 class Domain(models.Model):
@@ -214,26 +248,40 @@ class File(models.Model):
         s += f'\n{self.path}'
         return s
     
-    def predelete(self):
+    def predelete(self, islastvar):
         """ 
         When a file is deleted, we need to make sure that the volume associated with
         it is removed from any collections and locations. 
-        We explicitly delete the variables because the sql delete cascade does not 
-        run the variable delete method, and we need that to happen,
+        We can arrive here via two routes: 
+        (1) The file is being deleted, in which case we want to delete all the variables
+        because the sql delete cascade does not run the variable delete method, and we
+        need that to happen, or
+        (2) This file is being deleted as the last variable which references is it
+        is being deleted.
+        : islastvar: boolean, False = option 1, True = option 2
         """
         for l in self.locations.all():
             l.volume -= self.size
             l.save()
+        if self.type == 'F':
+            return
         candidates = self.variable_set.all()
-        for v in candidates: 
-            v.delete()
-        #manifest attribute only exists on instances that are in manifests
-        if hasattr(self,'manifest'):
-            for f in self.manifest.fragments.all():
-                f.delete()
+        if not islastvar:
+            for v in candidates: 
+                v.delete()
+        # We need to get rid of fragments here, if we a manifest, since
+        # when we are deleted, our manifest goes too, leaving the fragments
+        # isolated, and we need to handle their deletion to get volumes
+        # to work properly
+        if hasattr(self,'manifests'):
+            print('Emptying CFA file fragments')
+            for m in self.manifests.all():
+                for f in m.fragments.all():
+                    f.delete()
 
     def delete(self,*args,**kwargs):
-        self.predelete()
+        is_lastvar = kwargs.pop('islastvar',False)
+        self.predelete(is_lastvar)
         super().delete(*args,**kwargs)
 
 
@@ -271,6 +319,12 @@ class Manifest(models.Model):
     total_size = models.PositiveBigIntegerField(null=True)
     parent_uuid = models.UUIDField(null=True)
 
+    def delete(self,*args,**kwargs):
+        print('Deleting manifest for {cfa_file}')
+        ignore = kwargs.pop('islastvar',None)
+        for f in self.fragments.all():
+            f.delete()
+        super().delete(*args,**kwargs)
 
 class Relationship(models.Model):
     class Meta:
@@ -382,7 +436,7 @@ class Variable(models.Model):
     time_domain = models.ForeignKey(TimeDomain, null=True, on_delete=models.SET_NULL)
     cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.SET_NULL)
     in_file = models.ForeignKey(File, on_delete=models.CASCADE)
-    in_manfest = models.ForeignKey(Manifest, null=True, on_delete=models.SET_NULL)
+    in_manifest = models.ForeignKey(Manifest, null=True, on_delete=models.SET_NULL)
 
     def get_kp(self, key):
         """ Return a specific key property by name """
@@ -473,7 +527,8 @@ class Variable(models.Model):
     def predelete(self):
         """ 
         When a variable is deleted, we need to make sure that any cell_methods, domains,
-        and terms which are unique to this variable are also deleted.
+        and terms which are unique to this variable are also deleted. Also delete any
+        files and manifests if this is the last variable in which they exist.
         """
         for x in ['spatial_domain','cell_methods','time_domain']:
             y = getattr(self,x)
@@ -486,6 +541,14 @@ class Variable(models.Model):
         # If no other variable references this key_property, delete it
             if key_property.variable_set.count() == 1:
                 key_property.delete()
+
+        #files and manifests:
+        for entity in ['in_manifest','in_file']:
+            instance = getattr(self,entity)
+            if instance is not None:
+                print(entity,instance)
+                if instance.variable_set.count() == 1:
+                    instance.delete(islastvar=True)
 
     def delete(self,*args,**kwargs):
         self.predelete()

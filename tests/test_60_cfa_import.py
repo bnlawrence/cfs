@@ -103,23 +103,40 @@ def test_fragments(django_dependencies):
     assert len(fragments) == 3
     assert len(files) == 1
 
-def test_cfa_cleanup(django_dependencies):
-    """ 
-    A good test to see if we can empty out the 
-    bulk of the database cleanly.
-    """
+
+def test_deletion(django_dependencies):
+
     test_db, ignore , ignore = django_dependencies
     collections = test_db.collection.retrieve(name_contains='posix')
     assert collections.count() == 1, "Failed to find correct number of posix collections"
-    frags = test_db.file.findall_by_type('F')
-    assert frags.count() == 3
-    # find all the variables in those collections and make sure we delete those
-    for collection in collections:
-        test_db.collection.delete(collection.name, force=True)
-    for v in test_db.variable.all():
-        assert v.in_files.count()!=0, f"Variable [{v}] should not exist if it is in NO files"
-    test_db.location_delete('vftesting')
-    # need to check we empty the fragment files too.
+
+    #first test whether or not a collection delete without forcing does the right thing
+    collection = collections[0]
+
+    # we assume there are only variable in the collection of interest, but start by checking that
+    n_all_variables = test_db.variable.count()
+    n_this_collection = test_db.variable.retrieve_in_collection(collection.name).count()
+    assert n_all_variables == n_this_collection
+
+    # expect this to raise an error as the collection contains the last copy of variables
+    with pytest.raises(PermissionError):
+        collection.delete()
+
+    #ok now test that deleting it with force, does remove the variable, files, and fragments.
+    collection.delete(force=True)
+
+    with pytest.raises(ValueError):
+        test_db.collection.retrieve_by_name('posix_cfa_example')
+
+    n_all_variables = test_db.variable.count()
+    assert n_all_variables == 0
+
+    files = test_db.file.findall_by_type('C')
+    assert files.count() == 0
+    
     frags = test_db.file.findall_by_type('F')
     assert frags.count() == 0
+
+   
+
 

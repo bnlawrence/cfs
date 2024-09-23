@@ -685,10 +685,13 @@ class VariableInterface(GenericHandler):
             return base.all()
     
 
-    def retrieve_in_collection(self, collection):
-        collection = self.collection_retrieve(collection)
-        variables = Variable.objects.filter(in_collection__in=collection)
-        return variables
+    def retrieve_in_collection(self, collection_name):
+        C = Collection.objects.get(name=collection_name)
+        return C.variables.all()
+    
+    def retrieve_all_collections(self, variable):
+        return variable.contained_in.all()
+
     
     def get_or_create(self, varprops, unique=True):
         """
@@ -834,7 +837,7 @@ class CollectionDB:
             created.append(file)
             manifests={}
             step = 1
-            manidata = filedata.pop('manifests',[])
+            manidata = filedata.pop('manifests',{})
             for key,value in manidata.items():
                 manifest = value.pop('manikey')
                 value['cfa_file'] = file

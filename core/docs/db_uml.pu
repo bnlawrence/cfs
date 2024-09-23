@@ -36,11 +36,6 @@ db.Collection o--o db.Tag
 db.Collection o--o db.Variable
 
 
-class db.Batch #e4f4d6 {
-    + id (BigAutoField)
-}
-
-
 class db.Domain #e4f4d6 {
     - id (AutoField)
     + name (CharField)
@@ -61,14 +56,12 @@ class db.File #e4f4d6 {
     + path (CharField)
     + size (PositiveIntegerField)
     + type (CharField)
-    ~ in_batch (ForeignKey)
     + checksum (CharField)
     + checksum_method (CharField)
     + uuid (UUIDField)
     + format (CharField)
     # locations (ManyToManyField)
 }
-db.File o--> db.Batch
 db.File o--o db.Location
 db.File .- db.File_type
 
@@ -136,7 +129,7 @@ class db.Variable #e4f4d6 {
     ~ time_domain (ForeignKey)
     ~ cell_methods (ForeignKey)
     ~ in_file (ForeignKey)
-    ~ in_manfest (ForeignKey)
+    ~ in_manifest (ForeignKey)
     # key_properties (ManyToManyField)
 }
 db.Variable o--> db.Domain
