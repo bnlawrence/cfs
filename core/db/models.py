@@ -314,7 +314,7 @@ class Manifest(models.Model):
     id = models.AutoField(primary_key=True)
     cfa_file = models.ForeignKey(File, on_delete=models.CASCADE, related_name="manifests")
     fragments = models.ManyToManyField(File,related_name='fragment_set')
-    bounds = models.BinaryField()
+    bounds = models.BinaryField(null=True)
     units = models.CharField(max_length=20)
     calendar = models.CharField(max_length=20)
     total_size = models.PositiveBigIntegerField(null=True)
