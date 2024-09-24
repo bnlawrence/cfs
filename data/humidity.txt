@@ -1,0 +1,243 @@
+Field: specific_humidity (ncvar%m01s00i010)
+-------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_10)
+----------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(85), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 900 s)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(85) = [19.999998092651367, ..., 85000.0] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(85)) = [19.999998092651367, ..., 85000.0] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(85)) = [0.997741281986237, ..., 0.0]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_2)
+---------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_3)
+---------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_4)
+---------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_5)
+---------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_6)
+---------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_7)
+---------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+ 
+Field: specific_humidity (ncvar%m01s00i010_8)
+---------------------------------------------
+Data            : specific_humidity(time(780), atmosphere_hybrid_height_coordinate(1), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 24 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(1) = [19.999998092651367] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(1)) = [19.999998092651367] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(1)) = [0.997741281986237]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+
+Field: specific_humidity (ncvar%m01s00i010_9)
+---------------------------------------------
+Data            : specific_humidity(time(93600), atmosphere_hybrid_height_coordinate(85), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: point
+Dimension coords: time(93600) = [1950-01-01 06:00:00, ..., 2015-01-01 00:00:00] 360_day
+                : atmosphere_hybrid_height_coordinate(85) = [19.999998092651367, ..., 85000.0] m
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+Coord references: standard_name:atmosphere_hybrid_height_coordinate
+Domain ancils   : atmosphere_hybrid_height_coordinate(atmosphere_hybrid_height_coordinate(85)) = [19.999998092651367, ..., 85000.0] m
+                : long_name=vertical coordinate formula term: b(k)(atmosphere_hybrid_height_coordinate(85)) = [0.997741281986237, ..., 0.0]
+                : surface_altitude(latitude(324), longitude(432)) = [[2793.953125, ..., 0.0]] m
+
+Field: specific_humidity (ncvar%m01s03i237)
+-------------------------------------------
+Data            : specific_humidity(time(187200), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: point
+Dimension coords: time(187200) = [1950-01-01 03:00:00, ..., 2015-01-01 00:00:00] 360_day
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+                : height(1) = [1.5] m
+Cell measures   : measure:area (external variable: ncvar%areacella)
+
+
+Field: specific_humidity (ncvar%m01s03i237_2)
+---------------------------------------------
+Data            : specific_humidity(time(23400), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 900 s)
+Dimension coords: time(23400) = [1950-01-01 12:00:00, ..., 2014-12-30 12:00:00] 360_day
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+                : height(1) = [1.5] m
+Cell measures   : measure:area (external variable: ncvar%areacella)
+
+
+Field: specific_humidity (ncvar%m01s03i237_3)
+---------------------------------------------
+Data            : specific_humidity(time(23400), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 900 s)
+Dimension coords: time(23400) = [1950-01-01 12:00:00, ..., 2014-12-30 12:00:00] 360_day
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+                : height(1) = [1.5] m
+Cell measures   : measure:area (external variable: ncvar%areacella)
+ 
+Field: specific_humidity (ncvar%m01s03i237_4)
+---------------------------------------------
+Data            : specific_humidity(time(780), latitude(324), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 900 s)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : latitude(324) = [-89.72222137451172, ..., 89.72222137451172] degrees_north
+                : longitude(432) = [0.4166666567325592, ..., 359.5833435058594] degrees_east
+                : height(1) = [1.5] m
+Cell measures   : measure:area (external variable: ncvar%areacella)
+ 
+Field: specific_humidity (ncvar%m01s30i205)
+-------------------------------------------
+Data            : specific_humidity(time(780), air_pressure(36), latitude(325), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 6 h)
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : air_pressure(36) = [1000.0, ..., 0.029999999329447746] hPa
+                : latitude(325) = [-90.0, ..., 90.0] degrees_north
+                : longitude(432) = [0.0, ..., 359.1666564941406] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+ 
+Field: specific_humidity (ncvar%m01s30i205_2)
+---------------------------------------------
+Data            : specific_humidity(time(780), air_pressure(36), latitude(325), longitude(1)) 1
+Cell methods    : area: mean time(780): mean (interval: 6 h) longitude(1): mean
+Dimension coords: time(780) = [1950-01-16 00:00:00, ..., 2014-12-16 00:00:00] 360_day
+                : air_pressure(36) = [1000.0, ..., 0.029999999329447746] hPa
+                : latitude(325) = [-90.0, ..., 90.0] degrees_north
+                : longitude(1) = [179.5833384245634] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+ 
+Field: specific_humidity (ncvar%m01s30i205_3)
+---------------------------------------------
+Data            : specific_humidity(time(23400), air_pressure(19), latitude(325), longitude(432)) 1
+Cell methods    : area: mean time: mean (interval: 900 s)
+Dimension coords: time(23400) = [1950-01-01 12:00:00, ..., 2014-12-30 12:00:00] 360_day
+                : air_pressure(19) = [1000.0, ..., 1.0] hPa
+                : latitude(325) = [-90.0, ..., 90.0] degrees_north
+                : longitude(432) = [0.0, ..., 359.1666564941406] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+
+Field: specific_humidity (ncvar%m01s30i205_4)
+---------------------------------------------
+Data            : specific_humidity(time(93600), air_pressure(9), latitude(325), longitude(432)) 1
+Cell methods    : area: mean time: point
+Dimension coords: time(93600) = [1950-01-01 06:00:00, ..., 2015-01-01 00:00:00] 360_day
+                : air_pressure(9) = [925.0, ..., 50.0] hPa
+                : latitude(325) = [-90.0, ..., 90.0] degrees_north
+                : longitude(432) = [0.0, ..., 359.1666564941406] degrees_east
+Cell measures   : measure:area (external variable: ncvar%areacella)
+
+
+
+ for h in fh: print(list(h.get_filenames())[1])
+unavailable:cs125_1_mon_0hrs__196402-196402.nc
+unavailable:cs125_1_t_mon__195911-195911.nc
+unavailable:cs125_1_mon_3hrs__197411-197411.nc
+unavailable:cs125_1_mon_6hrs__195512-195512.nc
+unavailable:cs125_1_mon_9hrs__197506-197506.nc
+unavailable:cs125_1_mon_12hrs__201305-201305.nc
+unavailable:cs125_1_mon_15hrs__199409-199409.nc
+unavailable:cs125_1_mon_18hrs__197003-197003.nc
+unavailable:cs125_1_mon_21hrs__199301-199301.nc
+unavailable:cs125_1_6hr_t_pt_cordex__195209-195209.nc
+unavailable:cs125_1_3hr_pt__195801-195801.nc
+unavailable:cs125_1_day_cordex__195604-195604.nc
+unavailable:cs125_1_day__198409-198409.nc
+unavailable:cs125_1_mon__195403-195403.nc
+unavailable:cs125_1_mon__195403-195403.nc
+unavailable:cs125_1_mon_z__195208-195208.nc
+unavailable:cs125_1_day__198409-198409.nc
+unavailable:cs125_1_6hr_pt__200502-200502.nc

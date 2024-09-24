@@ -1,0 +1,22 @@
+site_name: CFStore
+nav: 
+  - Home: index.md
+  - About: about.md
+  - Internal Logic: logic.md
+  - Project Layout: layout.md
+theme:
+  name: material
+plugins:
+  - search
+  - build_plantuml:
+      render: 'server'
+      bin_path: ''
+      server: 'http://www.plantuml.com/plantuml'
+      disable_ssl_certificate_validation: True
+      output_format: 'svg'
+      allow_multipe_roots: false
+      diagram_root: 'docs/diagrams/'
+      output_folder: 'out' 
+      input_folder: 'src'
+      input_extensions: ''
+
