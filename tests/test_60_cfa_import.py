@@ -64,6 +64,7 @@ def cfa_resources(tmp_path, inputfield):
     #FIXME: I don't think the substitutions are being parsed properly.
     cf.write(f, cfa_file, cfa={'absolute_paths':False,
                                'substitutions':{'base':'./'}})
+    os.system(f'ncdump {cfa_file}')
     print('CFA setup with three files and one field')
 
     return posix_path

@@ -21,8 +21,7 @@ def cfupload_variables(db, location, fd, collection, extra_collections, cfa=Fals
     fields = cf.read(fd['path'])
     t2 = time()
     logger.info(f"Initial CF read of {fd['name']} took {t2-t1:.2f}s")
-    logger.warning('Limiting field parsing to ten items, remove restriction in production')
-    descriptions, manifests = parse_fields_todict(fields[0:10], cfa=cfa)
+    descriptions, manifests = parse_fields_todict(fields, cfa=cfa)
     t2b = time()-t2
     logger.info(f'Parsing to dictionary took {t2b:.2f}s')
 

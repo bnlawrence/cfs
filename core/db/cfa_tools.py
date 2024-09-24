@@ -45,12 +45,17 @@ class CFAManifest:
     def add_fragment(self, file_path):
         """ 
         Add fragment via file_path.
-        For the moment I'm not handling base redirection. 
+        For the moment I'm not handling multiple fragments. 
         """
         if file_path in self.fragments:
             raise ValueError('Attempt to add existing fragment into manifest')
         fragment = self.fragment_template.copy()
-        fragment['name'] = Path(file_path).name
+        name =  Path(file_path).name
+        if ':' in name:
+            base, name = name.split(':')
+            if base != '':
+                fragment['base'] = base
+        fragment['name'] = name
         fragment['path'] = file_path
         if self.accessor:
             fragment['size'] = self.accessor.get_size(file_path)
@@ -160,8 +165,9 @@ class CFAhandler:
         new_manifest = CFAManifest(accessor=self.accessor)
         for f in filenames:
             new_manifest.add_fragment(f)
-        bounds = self._parse_bounds_from_field(field, tdim)
-        new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
+        if tdim is not None:
+            bounds = self._parse_bounds_from_field(field, tdim)
+            new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
         return self._add_known_and_exit(new_manifest, field)
 
     def _add_known_and_exit(self, manifest, field):

@@ -315,13 +315,12 @@ class Manifest(models.Model):
     cfa_file = models.ForeignKey(File, on_delete=models.CASCADE, related_name="manifests")
     fragments = models.ManyToManyField(File,related_name='fragment_set')
     bounds = models.BinaryField(null=True)
-    units = models.CharField(max_length=20)
-    calendar = models.CharField(max_length=20)
+    units = models.CharField(null=True, max_length=20)
+    calendar = models.CharField(null=True,max_length=20)
     total_size = models.PositiveBigIntegerField(null=True)
     parent_uuid = models.UUIDField(null=True)
 
     def delete(self,*args,**kwargs):
-        print('Deleting manifest for {cfa_file}')
         ignore = kwargs.pop('islastvar',None)
         for f in self.fragments.all():
             f.delete()
@@ -329,7 +328,7 @@ class Manifest(models.Model):
 
     def __str__(self):
         fcount = self.fragments.count()
-        return f'Manifest ({fcount} fragments from {self.cfa_file.name})'
+        return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n...first file {self.fragments.first()}.'
 
 
 class Relationship(models.Model):
@@ -404,7 +403,7 @@ class Variable(models.Model):
     class Meta:
         app_label = "db"
         constraints = [
-            UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file'], 
+            UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file','in_manifest'], 
                              name='unique_combination_of_fk_fields')
         ]
 

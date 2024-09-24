@@ -425,6 +425,7 @@ class LocationInterface(GenericHandler):
 class ManifestInterface(GenericHandler):
     def __init__(self):
         super().__init__(Manifest)
+        self.location = LocationInterface()
 
     def add(self, properties):
         """
@@ -438,6 +439,13 @@ class ManifestInterface(GenericHandler):
             logger.info(f'Removed cells {cells} from manifest, why did we want them?')
         # parse fragment file dictionaries into proper files
         fragments = properties.pop('fragments')
+        # pull out bases if they exist
+        for k,f in fragments.items():
+            base = f.pop('base',None)
+            if base is not None:
+                loc = self.location.get_or_create(base)
+                f['location']=loc
+        print(fragments)
         properties.pop('_bounds_ncvar')  #not intended for the database
         with transaction.atomic():
             # we do this directly for efficiency, and to bypass
