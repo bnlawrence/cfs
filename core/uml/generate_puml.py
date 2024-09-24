@@ -51,6 +51,6 @@ def standard_view(output_file='db-model.pu'):
 
 if __name__=="__main__":
     here =  Path( __file__ ).absolute() 
-    output_file = here.parent.parent/'docs/db_uml.pu'
+    output_file = here.parent.parent.parent/'docs/diagrams/src/db_uml.pu'
     standard_view(output_file)
     working_dir.cleanup()
