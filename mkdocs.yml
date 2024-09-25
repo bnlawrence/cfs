@@ -2,9 +2,11 @@ site_name: CFStore
 nav: 
   - Home: index.md
   - About: about.md
-  - Internal Logic: logic.md
   - Atomic Datasets: atomic.md
-  - Project Layout: layout.md
+  - Developer:
+    - Project Layout: layout.md
+    - Internal Logic: logic.md
+    - Django: django.md
 theme:
   name: material
   logo: img/ncas_white.png
@@ -14,8 +16,11 @@ plugins:
   - search
   - mkdocstrings:
       default_handler: python
-      show_root_heading: True
-      show_signature: True
+      handlers: 
+        python:
+          options:
+            show_root_heading: True
+            show_signature: True
   - build_plantuml:
       render: 'server'
       bin_path: ''

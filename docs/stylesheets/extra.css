@@ -14,7 +14,7 @@ h2.doc-heading code {
 /* Ugly hack to deal with the failure of mkdocs to 
 handle the Django model classes sensibly */
 
-a[id^="core.db.models"]::after {
+a[id^="core.db"]::after {
     content: attr(id); /* Use the ID as the class name */
     display: block;
     font-size: 1.5em;

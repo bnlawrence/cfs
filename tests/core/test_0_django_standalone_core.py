@@ -14,7 +14,7 @@ def test_blank_database(tmp_path, request):
                  migrations_location=migrations_location)
 
 
-    from core.db.models import File
+    from core.models import File
 
     file1 = File(name='myfile1',path='/tmp/myfile1',size=1)
     file2 = File(name='myfile2',path='/tmp/myfile2',size=2)

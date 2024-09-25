@@ -69,13 +69,13 @@ def check_and_create_database():
         # suppressing warning about discouraging access to database during app initialisation
         warnings.simplefilter('ignore')
         with connection.cursor() as cursor:
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=%s", ['db_tag'])
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=%s", ['core_tag'])
             result = cursor.fetchone()
     # If the table doesn't exist, run the migration commands to create the tables
     if not result:
         print("Database doesn't exist or tables are missing. Creating tables...")
         # Apply migrations programmatically to create the tables
-        execute_from_command_line(['manage.py','makemigrations','db'])
+        execute_from_command_line(['manage.py','makemigrations','core'])
         execute_from_command_line(['manage.py','migrate'])
     else:
         print("Using existing database without modification")
@@ -134,7 +134,7 @@ def setup_django(db_file=None,
         settings.configure(
             BASE_DIR = Path(__file__).resolve().parent.parent,
             DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField',
-            INSTALLED_APPS=('core.db',),
+            INSTALLED_APPS=('core',),
             DATABASES={
                 'default': {
                     'ENGINE': 'django.db.backends.sqlite3',

@@ -16,8 +16,7 @@ def sizeof_fmt(num, suffix="B"):
 
 
 class Cell_Method(models.Model):
-    class Meta:
-        app_label = "db"
+    
     method = models.CharField(max_length=256)
     axis = models.CharField(max_length=64)
     def __str__(self):
@@ -29,8 +28,7 @@ class Cell_MethodSet(models.Model):
     for variable identity matching. THe other option of directly
     linking cell method make creating new variables very inefficient.
     """
-    class Meta:
-        app_label = "db"
+   
     methods = models.ManyToManyField(Cell_Method)
     key = models.CharField(max_length=64, unique=True)
     def __str__(self):
@@ -54,8 +52,6 @@ class Cell_MethodSet(models.Model):
 
 
 class CollectionType(models.Model):
-    class Meta:
-        app_label = "db"
 
     id = models.AutoField(primary_key=True)
     value = models.TextField()
@@ -63,8 +59,6 @@ class CollectionType(models.Model):
 
 
 class Collection(models.Model):
-    class Meta:
-        app_label = "db"
 
     def __len__(self):
         return len(self._proxied)
@@ -138,8 +132,7 @@ class Domain(models.Model):
     : size : number of xyz points
     : coordinates: comma separarated spatial coordinate names
     """
-    class Meta:
-        app_label="db"
+  
     id = models.AutoField(primary_key=True)
     # we can't make name unique ... 
     name = models.CharField(max_length=64)
@@ -207,9 +200,6 @@ class File(models.Model):
     we don't allow that to happen. 
 
     """
-   
-    class Meta:
-        app_label = "db"
 
     id = models.AutoField(primary_key=True)
     
@@ -284,9 +274,7 @@ class File(models.Model):
 
 
 class Location(models.Model):
-    class Meta:
-        app_label = "db"
-
+  
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=256)
     volume = models.PositiveBigIntegerField(default=0)
@@ -329,9 +317,7 @@ class Manifest(models.Model):
 
 
 class Relationship(models.Model):
-    class Meta:
-        app_label = "db"
-
+  
     def __str__(self):
         return f'[{self.subject.name}] [{self.predicate}] [{self.related_to.name}]'
 
@@ -341,16 +327,11 @@ class Relationship(models.Model):
 
 
 class Tag(models.Model):
-    class Meta:
-        app_label = "db"
 
     id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=64)
 
 class TimeDomain(models.Model):
-
-    class Meta:
-        app_label="db"
 
     interval =  models.PositiveIntegerField()
     interval_units = models.CharField(max_length=3,default='d')
@@ -386,8 +367,6 @@ class VariableProperty(models.Model):
     We hold all the properties which get used as keys and values of 
     heavily used properties so we can speed things up.
     """
-    class Meta:
-        app_label = "db"
 
     id = models.AutoField(primary_key=True)
     key = models.CharField(max_length=2, choices=VariablePropertyKeys)
@@ -403,7 +382,6 @@ class Variable(models.Model):
     as spatial and temporal domains and cell methods.
     """
     class Meta:
-        app_label = "db"
         constraints = [
             UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file','in_manifest'], 
                              name='unique_combination_of_fk_fields')

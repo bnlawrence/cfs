@@ -16,6 +16,7 @@ setup(
         'h5netcdf',
         'mkdoc',
         'mkdocstrings',
+        'mkdocstrings-python'
         'mkdocs-build-plantuml-plugin'
         ]
     )

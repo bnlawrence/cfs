@@ -4,6 +4,9 @@ A key concept for CFstore is that of an _atomic dataset_.  The notion is importa
 
 Once you have atomic datasets, we need them to be unique, so we can handle quarks (subsets, and/or replicants, in different locations) properly.
 
-The Variable model class is the key one for instantiating all the important logic.
+The Variable model class is the key one for instantiating all the important logic, but it is the Variable interface
+that is used in the middleware logic.
 
-::: core.db.models.Variable
+::: core.models.Variable
+
+::: core.db.interface.VariableInterface
