@@ -1,0 +1,93 @@
+:root {
+    --md-primary-fg-color:        #186f4d;  /* NCAS Earth Green */
+  }
+/* Styling class addresses */
+h2.doc-heading code {
+    font-size: 0.8em;
+    font-family: "Fira Code", monospace;
+    background-color: #f9f9f9;
+    padding: 2px 5px;
+    border-radius: 4px;
+    color: var(--md-primary-fg-color);
+}
+
+/* Ugly hack to deal with the failure of mkdocs to 
+handle the Django model classes sensibly */
+
+a[id^="core.db.models"]::after {
+    content: attr(id); /* Use the ID as the class name */
+    display: block;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--md-primary-fg-color);
+    margin-bottom: 0.5em;
+}
+
+/* Style the class Bases (optional) */
+.doc-class-bases {
+    font-size: 1em;
+    color: #666;
+}
+
+
+/* Styling method headings */
+.doc-heading {
+    font-size: 1em;
+    font-weight: bold;
+    color: var(--md-primary-fg-color);
+    margin-top: 1em;
+}
+
+/* Specific styling for methods within the code block */
+.doc-heading code .fm,  /* For magic methods like __str__ */
+.doc-heading code .n {   /* For regular methods like dump */
+    color: var(--md-primary-fg-color); /* Ensure both use the primary theme color */
+    font-size: 0.8em;  /* Adjust the font size */
+}
+
+/* You can also style the parentheses to ensure consistency */
+.doc-heading code .p {
+    font-size: 1em;
+    color: #666;  /* Optional, for parentheses */
+}
+
+.doc-heading code {
+    font-size: 1.2em;
+    background-color: #f5f5f5;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    color: #333;
+}
+
+/* Style the <details> container */
+.doc-contents details {
+    width: 90%;            /* Set width to 90% */
+    margin-left: auto;     /* Center the block */
+    margin-right: auto;    /* Center the block */
+    margin-top: 1em;       /* Add some space above */
+    margin-bottom: 1em;    /* Add some space below */
+    padding: 1em;          /* Optional: add padding */
+    background-color: #f9f9f9; /* Optional: change background */
+    border-radius: 4px;    /* Rounded corners for nicer look */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+}
+
+/* Style the <table> inside the details */
+.doc-contents details .highlighttable {
+    width: 100%;            /* Make the table take full width of the details */
+    margin-left: auto;      /* Ensure it's centered */
+    margin-right: auto;
+}
+
+/* Style the <pre> and <code> elements inside the table */
+.doc-contents details pre, 
+.doc-contents details code {
+    font-size: 1em;         /* Adjust the font size for readability */
+    padding: 0.5em;         /* Add padding inside the code block */
+}
+
+/* Style the line numbers if needed */
+.doc-contents details .linenodiv {
+    padding-right: 1em;     /* Space between line numbers and code */
+    color: #888;            /* Make line numbers less prominent */
+}

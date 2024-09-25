@@ -3,20 +3,29 @@ nav:
   - Home: index.md
   - About: about.md
   - Internal Logic: logic.md
+  - Atomic Datasets: atomic.md
   - Project Layout: layout.md
 theme:
   name: material
+  logo: img/ncas_white.png
+  palette:
+     primary: custom
 plugins:
   - search
+  - mkdocstrings:
+      default_handler: python
+      show_root_heading: True
+      show_signature: True
   - build_plantuml:
       render: 'server'
       bin_path: ''
       server: 'http://www.plantuml.com/plantuml'
       disable_ssl_certificate_validation: True
       output_format: 'svg'
-      allow_multipe_roots: false
+      allow_multiple_roots: false
       diagram_root: 'docs/diagrams/'
       output_folder: 'out' 
       input_folder: 'src'
       input_extensions: ''
-
+extra_css:
+  - stylesheets/extra.css

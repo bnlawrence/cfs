@@ -56,10 +56,88 @@ def test_simple_variable(test_data):
                   'spatial_domain':STD_DOMAIN_PROPERTIES, 'time_domain':STD_TEMPORAL,}
     var = test_db.variable.get_or_create(properties)
     assert var.get_kp('identity') == 'test var 1'
+    assert var.get_kp('atomic_origin') == 'imaginary'
     loc = test_db.location.retrieve('varloc')
     assert loc.volume == FILE_PROPERTIES['size']
     print(var.dump())
     
+def test_unique_variable_insertion(test_data):
+    """
+    Test that unique variables with different key properties can be inserted.
+    Sharing domains!
+    """
+    test_db, file, _ = test_data
+
+    properties_a = {
+        'identity': 'var A',
+        'atomic_origin': 'origin A',
+        'in_file': file,
+        'spatial_domain': STD_DOMAIN_PROPERTIES,
+        'time_domain': STD_TEMPORAL
+    }
+    
+    properties_b = {
+        'identity': 'var B',
+        'atomic_origin': 'origin B',
+        'in_file': file,
+        'spatial_domain': STD_DOMAIN_PROPERTIES,
+        'time_domain': STD_TEMPORAL
+    }
+
+    var_a = test_db.variable.get_or_create(properties_a)
+    var_b = test_db.variable.get_or_create(properties_b)
+    
+    assert var_a.get_kp('identity') == 'var A'
+    assert var_b.get_kp('identity') == 'var B'
+    assert test_db.xydomain.count() == 1
+
+def test_duplicate_variable_rejected(test_data):
+    """
+    Test that inserting a duplicate variable raises an error.
+    """
+    test_db, file, _ = test_data
+
+    properties = {
+        'identity': 'duplicate var',
+        'atomic_origin': 'same origin',
+        'in_file': file,
+        'spatial_domain': STD_DOMAIN_PROPERTIES,
+        'time_domain': STD_TEMPORAL
+    }
+
+    # Insert the first variable
+    var_1 = test_db.variable.get_or_create(properties)
+
+    # Attempt to insert the same variable again
+    with pytest.raises(PermissionError):
+        var_2 = test_db.variable.get_or_create(properties)
+
+
+def test_get_or_create_unique_instance(test_data):
+    """
+    Test the get_or_create_unique_instance method to ensure uniqueness checks are working.
+    """
+    test_db, file, _ = test_data
+
+    properties = {
+        'identity': 'unique var',
+        'atomic_origin': 'unique origin',
+        'in_file': file,
+        'spatial_domain': STD_DOMAIN_PROPERTIES,
+        'time_domain': STD_TEMPORAL
+    }
+
+    var = test_db.variable.get_or_create(properties)
+    assert var.get_kp('identity') == 'unique var'
+
+    # Try creating it again (should return the same instance, not create a new one)
+    var_duplicate = test_db.variable.get_or_create(properties, unique=False)
+    assert var == var_duplicate
+
+    with pytest.raises(PermissionError):
+        var_duplicate = test_db.variable.get_or_create(properties, unique=True)
+    
+
 
 def test_keys_with_same_value(test_data):
     test_db, f, c  = test_data
@@ -67,14 +145,6 @@ def test_keys_with_same_value(test_data):
                    'spatial_domain':STD_DOMAIN_PROPERTIES, 'in_file':f,'time_domain':STD_TEMPORAL}
     var = test_db.variable.get_or_create(properties)
 
-
-def test_sharing_domain(test_data):
-    test_db, f, c  = test_data
-    properties = {'identity':'test var 3','atomic_origin':'imaginary','in_file':f,
-                  'spatial_domain':STD_DOMAIN_PROPERTIES,'time_domain':DAILY_TEMPORAL}
-    var = test_db.variable.get_or_create(properties)
-    assert test_db.xydomain.count() == 1
-    assert test_db.variable.count() == 3
 
 def test_not_sharing_domain(test_data):
     test_db, f, c  = test_data
@@ -84,9 +154,7 @@ def test_not_sharing_domain(test_data):
                   'spatial_domain':domain_properties,'time_domain':STD_TEMPORAL}
     var = test_db.variable.get_or_create(properties)
     db = test_db.xydomain.all()
-    print(db)
     assert test_db.xydomain.count() == 2
-    assert test_db.variable.count() == 4
 
 def test_creating_variable_with_properties(test_data):
     test_db, f, c  = test_data
@@ -94,7 +162,7 @@ def test_creating_variable_with_properties(test_data):
                   'spatial_domain': STD_DOMAIN_PROPERTIES, 'time_domain':DAILY_TEMPORAL,
                   'experiment':'mytest','institution':'Narnia','in_file':f}
     var = test_db.variable.get_or_create(properties)
-    assert test_db.variable.count() == 5
+    assert var['institution'] == 'Narnia'
 
 def test_retrieving_by_property_keys(test_data):
     test_db, f, c  = test_data

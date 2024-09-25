@@ -13,6 +13,9 @@ setup(
         'rich',
         'tqdm',
         'cf',
-        'h5netcdf'
+        'h5netcdf',
+        'mkdoc',
+        'mkdocstrings',
+        'mkdocs-build-plantuml-plugin'
         ]
     )

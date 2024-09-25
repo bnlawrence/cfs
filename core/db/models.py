@@ -124,8 +124,6 @@ class Collection(models.Model):
     def delete(self,*args,**kwargs):
         force = kwargs.pop('force',False)
         self.do_empty(force=force)
-        print('deletion begins')
-        print(self.unique_variables())
         if self.unique_variables().count() > 0:
             raise PermissionError(f'Cannot delete collection {self} with unique variables')
         super().delete(*args,**kwargs)
@@ -275,7 +273,6 @@ class File(models.Model):
         # isolated, and we need to handle their deletion to get volumes
         # to work properly
         if hasattr(self,'manifests'):
-            print('Emptying CFA file fragments')
             for m in self.manifests.all():
                 for f in m.fragments.all():
                     f.delete()
@@ -400,12 +397,17 @@ class VariableProperty(models.Model):
 
 
 class Variable(models.Model):
+    """
+    Holds the logic for atomic dataset handling, including building up an atomic
+    dataset out of re-usable entities which atomic dataset have in common, such
+    as spatial and temporal domains and cell methods.
+    """
     class Meta:
         app_label = "db"
         constraints = [
             UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file','in_manifest'], 
                              name='unique_combination_of_fk_fields')
-        ]
+        ]  # We can't include key properties here, because django can't handle it. This might be a problem.
 
     def __len__(self):
         return len(self._proxied)
@@ -428,21 +430,6 @@ class Variable(models.Model):
     def keys(self):
         return self._proxied.keys()
 
-    def exists(self):
-        return True
-    
-    def __str__(self):
-        return self.get_kp('identity')
-    
-    def dump(self):
-        s = f"\nField: {self.get_kp('identity')} ({self.get_kp('atomic_origin')})\n"
-        s+=f"  sn: {self.get_kp('standard_name')}; ln: {self.get_kp('long_name')}\n"
-        for x in ['cell_methods','spatial_domain','time_domain','in_file']:
-            value = getattr(self,x,None)
-            if value is not None:
-                s+= f'  {x}: {value}\n'
-        return s
-
     id = models.AutoField(primary_key=True)
     _proxied = models.JSONField()
     key_properties = models.ManyToManyField(VariableProperty)
@@ -452,6 +439,24 @@ class Variable(models.Model):
     in_file = models.ForeignKey(File, on_delete=models.CASCADE)
     in_manifest = models.ForeignKey(Manifest, null=True, on_delete=models.SET_NULL)
 
+    def __str__(self):
+        """ String representation using the identity key property"""
+        return self.get_kp('identity')
+    
+    def dump(self):
+        """ 
+        Dump a fuller representation of the variable, including all
+        the important re-usable subcomponents.
+        """
+        s = f"\nField: {self.get_kp('identity')} ({self.get_kp('atomic_origin')})\n"
+        s+=f"  sn: {self.get_kp('standard_name')}; ln: {self.get_kp('long_name')}\n"
+        for x in ['cell_methods','spatial_domain','time_domain','in_file']:
+            value = getattr(self,x,None)
+            if value is not None:
+                s+= f'  {x}: {value}\n'
+        return s
+    
+    
     def get_kp(self, key):
         """ Return a specific key property by name """
         # Use the mykey method from VariablePropertyKeys to map from prop_name to the enum value
@@ -468,78 +473,97 @@ class Variable(models.Model):
             return None  # Return None if no matching property is found
 
 
-    def save(self, *args, **kwargs):
-         # Check uniqueness of other fields first
+    @classmethod    
+    def __check_uniqueness(cls, kp, _proxied, spatial_domain, time_domain, cell_methods, in_file, in_manifest):
+        """ 
+        Check whether or not the incoming variable description has been seen before. Start by checking
+        that key properties exist and include an identity. Then check all the existing instances with the
+        same properties. Two steps, first the same attributes, then check all the many-to-many relations
+        for duplicates.
+        """
+
+        # Check uniqueness of other fields first
         try:
-            kp = kwargs.pop('key_properties')
+            
             keys = [k.key for k in kp]
             assert 'ID' in keys
         except:
             # This is not normal Django behaviour, but the Variable uniqueness isn't normal Django either
-            raise ValueError('Variables must be saved with key properties, one of which must be identity!')
-        
-        existing_instance = Variable.objects.filter(
-            _proxied=self._proxied,
-            spatial_domain=self.spatial_domain,
-            time_domain=self.time_domain,
-            cell_methods=self.cell_methods,
-            in_file=self.in_file,
-            ).first()
-        
-        # Manually enforce uniqueness of key_properties in combination with the other fields
-        if existing_instance:
-
-            existing_key_properties = set(existing_instance.key_properties.all())
-            new_key_properties = set(kp)
-
-            if existing_key_properties == new_key_properties:
-                raise ValueError('An instance with this combination of fields and key_properties already exists.')
-
-        # Now that checks have passed, we can save the object
-        super().save(*args, **kwargs)  # Save the instance
-        self.key_properties.set(kp)   
-
-    @classmethod
-    def get_or_create_unique_instance(cls, _proxied, key_properties, spatial_domain, time_domain, cell_methods, 
-                                      in_file, in_manifest):
-        """ Sadly repeats a lot of the save logic"""
-        # Ensure that key_properties contains the required 'identity'
-        keys = [k.key for k in key_properties]
-        if 'ID' not in keys:
             raise ValueError("One of the key_properties ({key_properties}) must be 'identity'!")
-
-        # Try to find an existing instance with the same non-ManyToMany fields
-        existing_instance = cls.objects.filter(
+        
+        # First get all the existing instances
+        existing_instances = Variable.objects.filter(
             _proxied=_proxied,
             spatial_domain=spatial_domain,
             time_domain=time_domain,
             cell_methods=cell_methods,
             in_file=in_file,
             in_manifest=in_manifest,
-        ).first()
+            )
+        
+        # Now iterate over them all and check combinations
+        for existing_instance in existing_instances:
 
-        if existing_instance:
-            # Check if the key_properties match
-            existing_key_properties = set(existing_instance.key_properties.all())
-            input_key_properties = set(key_properties)
+            # Convert existing key_properties to a set of (key, value) tuples
+            existing_key_properties = set(
+                (prop.key, prop.value) for prop in existing_instance.key_properties.all()
+            )
 
-            if existing_key_properties == input_key_properties:
-                return existing_instance, False  # Instance with matching key_properties exists
+            # Convert new key_properties (kp) to a set of (key, value) tuples
+            new_key_properties = set(
+                (prop.key, prop.value) for prop in kp  # kp is passed as a list of VariableProperty instances
+            )
 
-        # If no matching instance is found, create a new instance
-        new_instance = cls(
-            _proxied=_proxied,
-            spatial_domain=spatial_domain,
-            time_domain=time_domain,
-            cell_methods=cell_methods,
-            in_file=in_file,
-            in_manifest=in_manifest
-        )
+            # If key_properties sets are equal, it's a duplicate
+            if existing_key_properties == new_key_properties:
+                return False, existing_instance  # Not unique, return the existing instance
 
-        # Save the new instance with the key_properties passed as kwargs
-        new_instance.save(key_properties=key_properties)
+        return True, None  # We are all good.
+    
+    def save(self, *args, **kwargs):
+        """ 
+        We have our own specific save method as we need to check uniqueness before attempting to save.
+        (calls __check_uniqueness__)
+        """
+        
+        kp = kwargs.pop('key_properties',[])
+        args_to_check = [getattr(self,x) for x in ('_proxied', 'spatial_domain', 'time_domain', 'cell_methods', 'in_file', 'in_manifest')]
+        unique, instance = self.__check_uniqueness(kp,*args_to_check)
+        if unique:
+            # Now that checks have passed, we can save the object
+            super().save(*args, **kwargs)  # Save the instance
+            self.key_properties.set(kp)
+        else:
+            raise ValueError(f'Cannot save non-unique variable with value {args}')   
 
-        return new_instance, True  # Return the new instance and a flag indicating creation
+    @classmethod
+    def get_or_create_unique_instance(cls, _proxied, key_properties, spatial_domain, time_domain, cell_methods, 
+                                      in_file, in_manifest):
+        """ 
+        We have our own specific get_or_create_unique_instance method, as we need to do a considerable 
+        amount of work to  check uniqueness. 
+        (calls __check_uniqueness__)
+        """
+        unique, instance = cls.__check_uniqueness(key_properties, _proxied, spatial_domain, time_domain, cell_methods, 
+                                      in_file, in_manifest)
+
+        if unique:
+            new_instance = cls(
+                _proxied=_proxied,
+                spatial_domain=spatial_domain,
+                time_domain=time_domain,
+                cell_methods=cell_methods,
+                in_file=in_file,
+                in_manifest=in_manifest
+                )
+
+            # Save the new instance with the key_properties passed as kwargs
+            new_instance.save(key_properties=key_properties)
+            
+            return new_instance, True  # Return the new instance and a flag indicating creation
+        
+        else:
+            return instance, False
     
     def predelete(self):
         """ 

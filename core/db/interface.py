@@ -433,7 +433,6 @@ class ManifestInterface(GenericHandler):
         This should always be unique.
         Can be deleted by deleting the parent file.
         """
-        print('Adding manifest')
         if 'cells' in properties:
             cells = properties.pop('cells')
             logger.info(f'Removed cells {cells} from manifest, why did we want them?')
@@ -445,7 +444,6 @@ class ManifestInterface(GenericHandler):
             if base is not None:
                 loc = self.location.get_or_create(base)
                 f['location']=loc
-        print(fragments)
         properties.pop('_bounds_ncvar')  #not intended for the database
         with transaction.atomic():
             # we do this directly for efficiency, and to bypass
