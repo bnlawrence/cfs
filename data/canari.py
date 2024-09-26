@@ -14,12 +14,12 @@ dbfile = here/'cfsdb.sqlite3'
 
 from django import setup
 from django.conf import settings
+settings.configure()
+setup()
 from core.plugins.posix import Posix
 ##setup_django(db_file=dbfile, migrations_location=migrations_location)
 from core.db.interface import CollectionDB
 
-settings.configure()
-setup()
 db = CollectionDB()
 
 def load(P, cname, restart=True):
