@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'core',
+    'cfs',
     'web',
 ]
 
@@ -94,7 +94,7 @@ if str(DBDIR) not in sys.path:
 
 # db this is the name of the database in the app label meta of the models in 
 # core.models.py
-migrations_dir = Path(DBDIR)/ 'core'
+migrations_dir = Path(DBDIR)/ 'cfs'
 if not migrations_dir.exists():
     migrations_dir.mkdir(parents=True, exist_ok=True)
 
@@ -106,7 +106,7 @@ dblast = Path(DBDIR).name
 
 # now force everthing to use that
 MIGRATION_MODULES={
-    'core': f'{dblast}.core.migrations',
+    'cfs': f'{dblast}.cfs.migrations',
 }
 
 # Database

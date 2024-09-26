@@ -3,8 +3,8 @@ import logging
 logger = logging.getLogger(__name__)
 import cf
 
-from core.db.cfparsing import parse_fields_todict
-from core.db.interface import LocationInterface
+from cfs.db.cfparsing import parse_fields_todict
+from cfs.db.interface import LocationInterface
 
 def cfupload_variables(db, location, fd, collection, extra_collections, cfa=False):
     """

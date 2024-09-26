@@ -1,4 +1,4 @@
-from core.db.standalone import setup_django
+from cfs.db.standalone import setup_django
 from pathlib import Path
 import pytest
 
@@ -14,7 +14,7 @@ def test_mixin(tmp_path, request):
     setup_django(db_file=dbfile,
                  migrations_location=migrations_location)
 
-    from core.db.interface import CollectionDB
+    from cfs.db.interface import CollectionDB
 
 
     prop1 = {'name':'myfile1','path':'/tmp/myfile1','size':10,'type':'S','location':'init'}

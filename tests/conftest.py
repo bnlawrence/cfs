@@ -9,8 +9,8 @@ def django_dependencies():
     tests, and is progressively modified as the tests proceed.
     Posix imports some django dependent stuff as well. 
     """
-    from core.db.interface import CollectionDB
-    from core.plugins.posix import Posix, get_parent_paths
+    from cfs.db.interface import CollectionDB
+    from cfs.plugins.posix import Posix, get_parent_paths
     db = CollectionDB()
     return db, Posix(db,'vftesting'), get_parent_paths
 

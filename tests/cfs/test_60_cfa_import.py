@@ -6,7 +6,7 @@ import os
 
 import logging
 
-from core.db.standalone import setup_django
+from cfs.db.standalone import setup_django
 
 VARIABLE_LIST = ['specific_humidity',]
 

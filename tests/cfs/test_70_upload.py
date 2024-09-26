@@ -2,7 +2,7 @@ import cf
 import pytest
 from pathlib import Path
 
-from core.db.standalone import setup_django
+from cfs.db.standalone import setup_django
 
 VARIABLE_LIST = ['air_temperature','specific_humidity','air_potential_temperature']
 

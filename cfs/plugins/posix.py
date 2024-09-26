@@ -1,4 +1,4 @@
-from core.db.file_handling import cfupload_ncfiles
+from cfs.db.file_handling import cfupload_ncfiles
 from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)

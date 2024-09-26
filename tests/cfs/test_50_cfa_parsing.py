@@ -1,6 +1,6 @@
 from pathlib import Path
-from core.db.cfa_tools import CFAhandler
-from core.db.cfparsing import parse_fields_todict
+from cfs.db.cfa_tools import CFAhandler
+from cfs.db.cfparsing import parse_fields_todict
 
 import cf
 import numpy as np

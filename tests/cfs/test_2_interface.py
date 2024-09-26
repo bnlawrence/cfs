@@ -1,4 +1,4 @@
-from core.db.standalone import setup_django
+from cfs.db.standalone import setup_django
 from pathlib import Path
 
 import pytest
@@ -39,7 +39,7 @@ def test_db():
     This database (and it's contents) is used in all the following
     tests, and is progressively modified as the tests proceed.
     """
-    from core.db.interface import CollectionDB
+    from cfs.db.interface import CollectionDB
     return CollectionDB()
    
 def test_collection_create(test_db):

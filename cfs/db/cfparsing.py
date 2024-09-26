@@ -2,7 +2,7 @@
 import cf
 import h5netcdf as h5
 import numpy as np
-from core.db.cfa_tools import CFAhandler
+from cfs.db.cfa_tools import CFAhandler
 from time import time
 import logging
 logger = logging.getLogger(__name__)

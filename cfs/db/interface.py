@@ -4,7 +4,7 @@ from django import template
 from django.db import transaction
 from django.db.models import Q, Count,OuterRef, Subquery
 
-from core.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
+from cfs.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
                             Domain, File, FileType, Location, Manifest,  
                             VariableProperty, VariablePropertyKeys,
                             Relationship, Tag, TimeDomain, Variable)

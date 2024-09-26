@@ -1,4 +1,4 @@
-from core.db.standalone import setup_django
+from cfs.db.standalone import setup_django
 from pathlib import Path
 from cfdm import cellmethod
 from django.db import connection
@@ -44,7 +44,7 @@ def test_data():
     This database (and it's contents) is used in all the following
     tests, and is progressively modified as the tests proceed.
     """
-    from core.db.interface import CollectionDB
+    from cfs.db.interface import CollectionDB
     cdb = CollectionDB()
     col = cdb.collection.create(name='Holding')
     file = cdb.file.create(FILE_PROPERTIES)

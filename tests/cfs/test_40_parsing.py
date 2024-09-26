@@ -1,6 +1,6 @@
-from core.db.cfparsing import LookupT, extract_cfsdomain
-from core.db.cfparsing import parse_fields_todict, parse2atomic_name
-from core.db.standalone import setup_django
+from cfs.db.cfparsing import LookupT, extract_cfsdomain
+from cfs.db.cfparsing import parse_fields_todict, parse2atomic_name
+from cfs.db.standalone import setup_django
 from django.db import connection
 from pathlib import Path
 
@@ -29,7 +29,7 @@ def test_db():
     This database (and it's contents) is used in all the following
     tests, and is progressively modified as the tests proceed.
     """
-    from core.db.interface import CollectionDB
+    from cfs.db.interface import CollectionDB
     return CollectionDB()
 
 def test_infer_timing():

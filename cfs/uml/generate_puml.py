@@ -1,6 +1,6 @@
 import tempfile
 from pathlib import Path
-from core.db.standalone import setup_django
+from cfs.db.standalone import setup_django
 
 working_dir = tempfile.TemporaryDirectory()
 working_path = Path(str(working_dir))
@@ -11,7 +11,7 @@ setup_django(db_file=dbfile, migrations_location=migrations_location)
 import codecs
 from django.apps import apps
 
-from core.uml.utils import PlantUml
+from cfs.uml.utils import PlantUml
 
 
 def standard_view(output_file='db-model.pu'):
