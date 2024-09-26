@@ -249,9 +249,10 @@ class File(models.Model):
         is being deleted.
         : islastvar: boolean, False = option 1, True = option 2
         """
-        for l in self.locations.all():
-            l.volume -= self.size
-            l.save()
+        if self.size is not None:
+            for l in self.locations.all():
+                l.volume -= self.size
+                l.save()
         if self.type == 'F':
             return
         candidates = self.variable_set.all()

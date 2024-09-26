@@ -31,6 +31,33 @@ def cfa_resources(tmp_path, inputfield):
     Make three copies of our basic netcdf file, and then aggregate it
     """
 
+    def fix_filenames(ncfile):
+        import xarray as xr
+
+        # open your dataset
+        ds = xr.open_dataset(ncfile)
+
+        # change an existing variable
+        base = '${base}'
+        shape = ds['cfa_file'].shape
+        new_filenames = np.vectorize(lambda f:f'{base}:{f}')(ds['cfa_file'].values)
+        reshaped_filenames = np.reshape(new_filenames, shape)
+        
+        ds['cfa_file'] = xr.DataArray(reshaped_filenames,
+                                      dims=ds['cfa_file'].dims)
+
+        # Ensure the _FillValue is correctly set for the specific_humidity variable
+        if '_FillValue' not in ds['specific_humidity'].encoding:
+            ds['specific_humidity'].encoding['_FillValue'] = None  # or None if it should remain blank
+        
+        # write a new file
+        ofile = str(ncfile).replace('.nc','.cfa')
+        ds.to_netcdf(ofile, mode='w')
+        os.remove(ncfile)
+        os.system(f'ncdump {ofile}')
+
+
+
     posix_path = tmp_path / 'posix_root'  
     posix_path.mkdir(exist_ok=True)  
     
@@ -60,11 +87,13 @@ def cfa_resources(tmp_path, inputfield):
         cf.write([v,],f)
 
     f = cf.read(posix_path.glob('*.nc'))
-    cfa_file = posix_path/'test_file.cfa'
+    cfa_file = posix_path/'test_file.nc'
     #FIXME: I don't think the substitutions are being parsed properly.
+    
     cf.write(f, cfa_file, cfa={'absolute_paths':False,
                                'substitutions':{'base':'./'}})
-    os.system(f'ncdump {cfa_file}')
+    fix_filenames(cfa_file)
+   
     print('CFA setup with three files and one field')
 
     return posix_path

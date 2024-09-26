@@ -442,7 +442,7 @@ class ManifestInterface(GenericHandler):
         for k,f in fragments.items():
             base = f.pop('base',None)
             if base is not None:
-                loc = self.location.get_or_create(base)
+                loc, created = self.location.get_or_create(base)
                 f['location']=loc
         properties.pop('_bounds_ncvar')  #not intended for the database
         with transaction.atomic():
@@ -450,8 +450,14 @@ class ManifestInterface(GenericHandler):
             # the interface file check on size, which we may not know
             # for fragment files.
             m = Manifest.objects.create(**properties)
-            file_objects = [File(**f) for k,f in fragments.items()]
+            # extract locations and prepare file objects 
+            locations = [f.pop('location',None) for f in fragments.values()]
+            file_objects = [File(**f) for f in fragments.values()]
+            # create them
             File.objects.bulk_create(file_objects)
+            # now we can add the locations
+            for loc, f in zip(locations,file_objects):
+                f.locations.add(loc)
             m.fragments.add(*file_objects)
             # no saves needed, all done by the transaction
         return m

@@ -12,11 +12,11 @@ setup(
         'click',
         'rich',
         'tqdm',
-        'cf',
+        #'cf',
         'h5netcdf',
-        'mkdoc',
-        'mkdocstrings',
-        'mkdocstrings-python'
-        'mkdocs-build-plantuml-plugin'
+        'mkdocs>=1.1',
+        'mkdocstrings>=0.26',
+        'mkdocstrings-python>=1.11',
+        #'mkdocs-build-plantuml-plugin'
         ]
     )

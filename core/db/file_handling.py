@@ -62,7 +62,7 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=F
     nf = 0 
     t1 = time()
     loci = LocationInterface()
-    loc = loci.get_or_create(location_name)
+    loc, created = loci.get_or_create(location_name)
     for fd in dbfiles:
         try:
             collections = fd.pop('collections')

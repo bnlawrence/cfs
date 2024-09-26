@@ -1,6 +1,13 @@
 from pathlib import Path
+import sys
+
 here = Path(__file__).parent.resolve()
-dbfile = here/'canari_test.db'
+
+# Add the parent directory of `cfs` to the Python path
+project_root = here.parent
+sys.path.append(str(project_root))
+
+dbfile = here/'cfsdb.sqlite3'
 migrations_location = str(here/'migrations')
 from core.db.standalone import setup_django
 setup_django(db_file=dbfile, migrations_location=migrations_location)

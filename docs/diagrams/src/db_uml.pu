@@ -1,28 +1,28 @@
 @startuml 
 hide attributes
-class db.Cell_Method #e4f4d6 {
+class core.Cell_Method #e8f4d6 {
     + id (BigAutoField)
     + method (CharField)
     + axis (CharField)
 }
 
 
-class db.Cell_MethodSet #e4f4d6 {
+class core.Cell_MethodSet #e8f4d6 {
     + id (BigAutoField)
     + key (CharField)
     # methods (ManyToManyField)
 }
-db.Cell_MethodSet o--o db.Cell_Method
+core.Cell_MethodSet o--o core.Cell_Method
 
 
-class db.CollectionType #e4f4d6 {
+class core.CollectionType #e8f4d6 {
     - id (AutoField)
     + value (TextField)
     + key (CharField)
 }
 
 
-class db.Collection #e4f4d6 {
+class core.Collection #e8f4d6 {
     + _proxied (JSONField)
     + name (CharField)
     + description (TextField)
@@ -31,12 +31,12 @@ class db.Collection #e4f4d6 {
     # tags (ManyToManyField)
     # variables (ManyToManyField)
 }
-db.Collection o--o db.CollectionType
-db.Collection o--o db.Tag
-db.Collection o--o db.Variable
+core.Collection o--o core.CollectionType
+core.Collection o--o core.Tag
+core.Collection o--o core.Variable
 
 
-class db.Domain #e4f4d6 {
+class core.Domain #e8f4d6 {
     - id (AutoField)
     + name (CharField)
     + region (CharField)
@@ -50,7 +50,7 @@ class db.Domain #e4f4d6 {
 }
 
 
-class db.File #e4f4d6 {
+class core.File #e8f4d6 {
     - id (AutoField)
     + name (CharField)
     + path (CharField)
@@ -62,18 +62,18 @@ class db.File #e4f4d6 {
     + format (CharField)
     # locations (ManyToManyField)
 }
-db.File o--o db.Location
-db.File .- db.File_type
+core.File o--o core.Location
+core.File .- core.File_type
 
 
-class db.Location #e4f4d6 {
+class core.Location #e8f4d6 {
     - id (AutoField)
     + name (CharField)
     + volume (PositiveBigIntegerField)
 }
 
 
-class db.Manifest #e4f4d6 {
+class core.Manifest #e8f4d6 {
     - id (AutoField)
     ~ cfa_file (ForeignKey)
     + bounds (BinaryField)
@@ -83,27 +83,27 @@ class db.Manifest #e4f4d6 {
     + parent_uuid (UUIDField)
     # fragments (ManyToManyField)
 }
-db.Manifest <--* db.File
-db.Manifest o--o db.File
+core.Manifest <--* core.File
+core.Manifest o--o core.File
 
 
-class db.Relationship #e4f4d6 {
+class core.Relationship #e8f4d6 {
     + id (BigAutoField)
     + predicate (CharField)
     ~ subject (ForeignKey)
     ~ related_to (ForeignKey)
 }
-db.Relationship <--* db.Collection
-db.Relationship <--* db.Collection
+core.Relationship <--* core.Collection
+core.Relationship <--* core.Collection
 
 
-class db.Tag #e4f4d6 {
+class core.Tag #e8f4d6 {
     - id (AutoField)
     + name (CharField)
 }
 
 
-class db.TimeDomain #e4f4d6 {
+class core.TimeDomain #e8f4d6 {
     + id (BigAutoField)
     + interval (PositiveIntegerField)
     + interval_units (CharField)
@@ -114,15 +114,15 @@ class db.TimeDomain #e4f4d6 {
 }
 
 
-class db.VariableProperty #e4f4d6 {
+class core.VariableProperty #e8f4d6 {
     - id (AutoField)
     + key (CharField)
     + value (CharField)
 }
-db.VariableProperty .- db.VariableProperty_key
+core.VariableProperty .- core.VariableProperty_key
 
 
-class db.Variable #e4f4d6 {
+class core.Variable #e8f4d6 {
     - id (AutoField)
     + _proxied (JSONField)
     ~ spatial_domain (ForeignKey)
@@ -132,15 +132,15 @@ class db.Variable #e4f4d6 {
     ~ in_manifest (ForeignKey)
     # key_properties (ManyToManyField)
 }
-db.Variable o--> db.Domain
-db.Variable o--> db.TimeDomain
-db.Variable o--> db.Cell_MethodSet
-db.Variable <--* db.File
-db.Variable o--> db.Manifest
-db.Variable o--o db.VariableProperty
+core.Variable o--> core.Domain
+core.Variable o--> core.TimeDomain
+core.Variable o--> core.Cell_MethodSet
+core.Variable <--* core.File
+core.Variable o--> core.Manifest
+core.Variable o--o core.VariableProperty
 
 
-enum db.File_type{
+enum core.File_type{
     + C - ('C', 'CFA File')
     + A - ('A', 'CFA File holds atomic dataset(s)')
     + Q - ('Q', 'CFA File holds quark(s)')
@@ -148,7 +148,7 @@ enum db.File_type{
     + F - ('F', 'Fragment File')
 }
 
-enum db.VariableProperty_key{
+enum core.VariableProperty_key{
     + SN - ('SN', 'standard_name')
     + LN - ('LN', 'long_name')
     + ID - ('ID', 'identity')
