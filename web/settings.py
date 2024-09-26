@@ -77,16 +77,19 @@ WSGI_APPLICATION = 'web.wsgi.application'
 # as putting the project data outside the python path of the project.
 
 # First, let's sort out where we are going to put our database and migrations directory
-DBDIR = os.getenv('CFS_DBDIR',None)
-if DBDIR is None or not os.path.isdir(DBDIR):
+DBDIR = os.getenv('CFS_DBDIR', None)
+if DBDIR is None: 
     raise ValueError(
         'Environment variable CFS_DBDIR must point to a directory for the DB and migrations')
+DBDIR = Path(DBDIR)
+if not DBDIR.is_dir:
+    raise ValueError ('Environment variable CFS_DBDIR does not point to an existing directory')
 
 # Now we need a migrations directory for our application
 # we need to be able to make this directory importable to be used for 
 # 
 # migrations
-if DBDIR not in sys.path:
+if str(DBDIR) not in sys.path:
     sys.path.append(DBDIR)
 
 # db this is the name of the database in the app label meta of the models in 
@@ -99,8 +102,12 @@ if not migrations_dir.exists():
 init_file = migrations_dir/'__init__.py'
 init_file.touch(exist_ok=True)
 
+dblast = Path(DBDIR).name
+
 # now force everthing to use that
-MIGRATION_MODULES=DBDIR
+MIGRATION_MODULES={
+    'core': f'{dblast}.core.migrations',
+}
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
