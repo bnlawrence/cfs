@@ -12,10 +12,9 @@ dbfile = here/'cfsdb.sqlite3'
 #migrations_location = str(here/'migrations')
 #from core.db.standalone import setup_django
 
-from django.conf import settings
 from django import setup
-
-from ..core.plugins.posix import Posix
+from django.conf import settings
+from core.plugins.posix import Posix
 ##setup_django(db_file=dbfile, migrations_location=migrations_location)
 from core.db.interface import CollectionDB
 
