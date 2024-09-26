@@ -12,7 +12,7 @@ setup(
         'click',
         'rich',
         'tqdm',
-        #'cf',
+        'cf-python',
         'h5netcdf',
         'mkdocs>=1.1',
         'mkdocstrings>=0.26',
