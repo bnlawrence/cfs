@@ -12,9 +12,10 @@ dbfile = here/'cfsdb.sqlite3'
 #migrations_location = str(here/'migrations')
 #from core.db.standalone import setup_django
 
-from django import setup
-from django.conf import settings
-settings.configure()
+#from django import setup
+#from django.conf import settings
+#settings.configure()
+#setup()
 
 import cfs
 import cfs.plugins
