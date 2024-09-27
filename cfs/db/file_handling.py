@@ -70,7 +70,7 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=F
             collections = []
         fd['type']=intent
         fd['location']=loc
-        logger.info('Handling {fd}')
+        logger.info(f'Handling {fd}')
         m, n, t = cfupload_variables(db, location_name, fd, base_collection.name, collections, cfa=cfa)
         msgs.append(m)
         nv += n
