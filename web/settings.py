@@ -9,9 +9,10 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
 from pathlib import Path
 import os, sys
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -81,8 +82,9 @@ DBDIR = os.getenv('CFS_DBDIR', None)
 if DBDIR is None: 
     raise ValueError(
         'Environment variable CFS_DBDIR must point to a directory for the DB and migrations')
+
 DBDIR = Path(DBDIR)
-if not DBDIR.is_dir:
+if not DBDIR.is_dir():
     raise ValueError ('Environment variable CFS_DBDIR does not point to an existing directory')
 
 # Now we need a migrations directory for our application
@@ -93,8 +95,9 @@ if str(DBDIR) not in sys.path:
     sys.path.append(DBDIR)
 
 # db this is the name of the database in the app label meta of the models in 
-# core.models.py
-migrations_dir = Path(DBDIR)/ 'cfs'
+# cfs.models.py. It needs to be at least one directory away from the migrations dir
+# to avoid import conflicts with the main cfs directory.
+migrations_dir = Path(DBDIR)/ 'cfs_migrations'
 if not migrations_dir.exists():
     migrations_dir.mkdir(parents=True, exist_ok=True)
 
@@ -106,8 +109,9 @@ dblast = Path(DBDIR).name
 
 # now force everthing to use that
 MIGRATION_MODULES={
-    'cfs': f'{dblast}.cfs.migrations',
+    'cfs': f'{dblast}.cfs_migrations',
 }
+
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases

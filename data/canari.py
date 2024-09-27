@@ -1,24 +1,12 @@
 from pathlib import Path
-import sys
-
 here = Path(__file__).parent.resolve()
+import os
+from django import setup
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.settings')
 
-# Add the parent directory of `cfs` to the Python path
-project_root = here.parent
-print(project_root)
-sys.path.append(str(project_root))
+setup()
 
-dbfile = here/'cfsdb.sqlite3'
-#migrations_location = str(here/'migrations')
-#from core.db.standalone import setup_django
 
-#from django import setup
-#from django.conf import settings
-#settings.configure()
-#setup()
-
-import cfs
-import cfs.plugins
 from cfs.plugins.posix import Posix
 ##setup_django(db_file=dbfile, migrations_location=migrations_location)
 from cfs.db.interface import CollectionDB
