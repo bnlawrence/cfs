@@ -544,8 +544,12 @@ class Variable(models.Model):
         unique, instance = self.__check_uniqueness(kp,*args_to_check)
         if unique:
             # Now that checks have passed, we can save the object
-            super().save(*args, **kwargs)  # Save the instance
-            self.key_properties.set(kp)
+            try:
+                super().save(*args, **kwargs)  # Save the instance
+                self.key_properties.set(kp)
+            except:
+                print(kwargs)
+                raise
         else:
             raise ValueError(f'Cannot save non-unique variable with value {args}')   
 

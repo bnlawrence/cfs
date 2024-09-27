@@ -452,13 +452,28 @@ class ManifestInterface(GenericHandler):
             m = Manifest.objects.create(**properties)
             # extract locations and prepare file objects 
             locations = [f.pop('location',None) for f in fragments.values()]
-            file_objects = [File(**f) for f in fragments.values()]
-            # create them
-            File.objects.bulk_create(file_objects)
+
+            # Check for existing files or prepare new ones for creation
+            existing_files = []
+            file_objects = []
+            for f in fragments.values():
+                existing_file = File.objects.filter(**f).first()
+                if existing_file:
+                    existing_files.append(existing_file)
+                else:
+                    file_objects.append(File(**f))
+            
+            # Bulk create new files
+            if file_objects:
+                File.objects.bulk_create(file_objects)
+
+            # Combine both newly created and existing files
+            all_files = file_objects + existing_files
+
             # now we can add the locations
-            for loc, f in zip(locations,file_objects):
+            for loc, f in zip(locations,all_files):
                 f.locations.add(loc)
-            m.fragments.add(*file_objects)
+            m.fragments.add(*all_files)
             # no saves needed, all done by the transaction
         return m
 
