@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.db.models.signals import pre_delete, m2m_changed, post_delete
 import hashlib
 from pathlib import Path
+import logging
+logger = logging.getLogger(__name__)
 
 from django.dispatch import receiver
 
@@ -335,7 +337,7 @@ class Manifest(models.Model):
 
     def __str__(self):
         fcount = self.fragments.count()
-        return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n...first file {self.fragments.first()}.'
+        return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n             (first file {self.fragments.first()}).'
 
 
 class Relationship(models.Model):
@@ -417,10 +419,10 @@ class Variable(models.Model):
     """
     class Meta:
         app_label = 'cfs'
-        constraints = [
-            UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file','in_manifest'], 
-                             name='unique_combination_of_fk_fields')
-        ]  # We can't include key properties here, because django can't handle it. This might be a problem.
+        #constraints = [
+        #    UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file','in_manifest'], 
+        #                     name='unique_combination_of_fk_fields')
+        #]  # We can't include key properties here, because django can't handle it. This might be a problem.
 
     def __len__(self):
         return len(self._proxied)
@@ -456,17 +458,24 @@ class Variable(models.Model):
         """ String representation using the identity key property"""
         return self.get_kp('identity')
     
-    def dump(self):
+    def _vars(self, with_proxied=True):
+        s = ''
+        for x in ['cell_methods','spatial_domain','time_domain','in_file','in_manifest','_proxied']:
+            if x != '_proxied' or with_proxied:
+                value = getattr(self,x,None)
+                if value is not None:
+                    s+= f'  {x}: {value}\n'
+        return s
+
+    
+    def dump(self, with_proxied=False):
         """ 
         Dump a fuller representation of the variable, including all
         the important re-usable subcomponents.
         """
         s = f"\nField: {self.get_kp('identity')} ({self.get_kp('atomic_origin')})\n"
         s+=f"  sn: {self.get_kp('standard_name')}; ln: {self.get_kp('long_name')}\n"
-        for x in ['cell_methods','spatial_domain','time_domain','in_file']:
-            value = getattr(self,x,None)
-            if value is not None:
-                s+= f'  {x}: {value}\n'
+        s+=self._vars(with_proxied=with_proxied)
         return s
     
     
@@ -544,12 +553,8 @@ class Variable(models.Model):
         unique, instance = self.__check_uniqueness(kp,*args_to_check)
         if unique:
             # Now that checks have passed, we can save the object
-            try:
-                super().save(*args, **kwargs)  # Save the instance
-                self.key_properties.set(kp)
-            except:
-                print(kwargs)
-                raise
+            super().save(*args, **kwargs)  # Save the instance
+            self.key_properties.set(kp)
         else:
             raise ValueError(f'Cannot save non-unique variable with value {args}')   
 
@@ -575,8 +580,14 @@ class Variable(models.Model):
                 )
 
             # Save the new instance with the key_properties passed as kwargs
-            new_instance.save(key_properties=key_properties)
-            
+            try:
+                new_instance.save(key_properties=key_properties)
+            except:
+                logger.debug('Crash coming. Details follow')
+                logger.debug(new_instance._vars(with_proxied=False))
+                logger.debug(key_properties)
+                raise
+
             return new_instance, True  # Return the new instance and a flag indicating creation
         
         else:
@@ -604,7 +615,6 @@ class Variable(models.Model):
         for entity in ['in_manifest','in_file']:
             instance = getattr(self,entity)
             if instance is not None:
-                print(entity,instance)
                 if instance.variable_set.count() == 1:
                     instance.delete(islastvar=True)
 

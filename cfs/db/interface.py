@@ -9,7 +9,8 @@ from cfs.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType,
                             VariableProperty, VariablePropertyKeys,
                             Relationship, Tag, TimeDomain, Variable)
 
-from tqdm import tqdm
+from time import time
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -480,6 +481,7 @@ class ManifestInterface(GenericHandler):
     def get_or_create(self):
         """ We do not want to allow access to the superclass method"""
         raise NotImplemented
+    
 
 
 class RelationshipInterface(GenericHandler):   
@@ -576,7 +578,10 @@ class TimeInterface(GenericHandler):
     def __init__(self):
         super().__init__(TimeDomain)
     def get_or_create(self,kw):
-        td, created = super().get_or_create(**kw)
+        if kw == {}:
+            td = None
+        else: 
+             td, created = super().get_or_create(**kw)
         return td
    
 
@@ -714,8 +719,12 @@ class VariableInterface(GenericHandler):
         In general we should not doing a retrieve when we want to create, hence the default
         value of unique.
         """
-
-        props = self._construct_properties(varprops)
+        try:
+            props = self._construct_properties(varprops)
+        except:
+            logger.debug('Crash coming')
+            logger.debug(varprops)
+            raise
         kp = [p.key for p in props['key_properties']]
         if 'ID' not in kp:
             raise ValueError('Variable definitions must include identity')
@@ -845,6 +854,8 @@ class CollectionDB:
         # manually controlling rollback
         step = 0
         created = []
+        #pathology=[]
+        #manology=[]
         try:
             file = self.file.create(filedata['properties'])
             created.append(file)
@@ -852,6 +863,7 @@ class CollectionDB:
             step = 1
             manidata = filedata.pop('manifests',{})
             for key,value in manidata.items():
+                #manology.append(value.copy())
                 manifest = value.pop('manikey')
                 value['cfa_file'] = file
                 step = 2
@@ -860,11 +872,27 @@ class CollectionDB:
             step = 3
             vars = []
             for v in filedata['variables']:
+                #pathology.append(v.copy())
                 key = v.pop('manikey',None)
                 if key is not None:
                     v['in_manifest'] = manifests[key]
                 v['in_file'] = file
-                var = self.variable.get_or_create(v)
+                t0 = time()
+                try:
+                    var = self.variable.get_or_create(v)
+                except:
+                    #import json
+                    #with open('crash.json','w') as f:
+                    #    for m in manology:
+                    #        if m['bounds'] is not None:
+                    #            m['bounds']=m['bounds'].tolist()
+                    #    p = {'manifests':manology,'variables':pathology}
+                    #    json.dump(p,f)
+                    #    print('dumped')
+                    raise
+                        
+                t1 = time()-t0
+                logger.info(f'Created ({t1:.2f}s) {var}')
                 created.append(var)
                 vars.append(var)
             step = 4

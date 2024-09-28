@@ -1,9 +1,9 @@
 from pathlib import Path
+from time import time
 here = Path(__file__).parent.resolve()
 import os
 from django import setup
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.settings')
-
 setup()
 
 
@@ -21,13 +21,15 @@ def load(P, cname, restart=True):
                 db.collection.delete(existing.name, force=True)
         except ValueError:
             pass
-        
+    t0 = time()
     P.add_collection(str(here),
                 cname,
                  "One of the CANARI atmospheric aggregation files",
                  regex='*.cfa',
                  intent='C'
     )
+    t1 = time()-t0
+    print(f'Canari load took {t1:.2f}s')
 
 def show_vars():
 
