@@ -1,10 +1,14 @@
 from django.shortcuts import render
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.template.loader import render_to_string
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
+
 from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
                         Location, Collection)
+#from gui.serializers import VariableSerializer
 
 # Create your views here.
 
@@ -133,6 +137,38 @@ def entity_select(request):
     data = [{'id':v.id, 'name':v.name} for v in target.objects.all()]
     return Response(data)
 
+@api_view(['POST'])
+def select_variables(request):
+    selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
+    page_number = request.data.get('page')  # Default to page 1
+    print(selections, page_number)
+
+    # Paginate results using vanilla django pagination, the DRF one didnt' work
+
+    results = Variable.objects.all()  
+    paginator = Paginator(results, 10)
+
+    try:
+        page_results = paginator.page(page_number)  # Get the specific page
+    except PageNotAnInteger:
+        # If page_number is not an integer, deliver the first page.
+        page_results = paginator.page(1)
+    except EmptyPage:
+        # If page_number is out of range (e.g. 9999), deliver the last page of results.
+        page_results = paginator.page(paginator.num_pages)
+
+    html = render_to_string('gui/variable.html', {'results': page_results})
+
+    #print('page',page_results.number,' of ', paginator.num_pages)
+    # Return the rendered HTML along with pagination info
+    return JsonResponse({
+        'html': html,
+        'total': paginator.count,  # Total count of results
+        'page': page_results.number,  # Current page
+        'total_pages': paginator.num_pages  # Total number of pages
+    })
+
+  
 
 
 

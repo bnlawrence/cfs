@@ -40,13 +40,31 @@
         </table>
     </div>
 
-    <button id="refreshBtn">Refresh Lists</button>
     <button id="sendSelectionsBtn">Send Selections</button>
+
+    <div id="results" class="results-block" style="display:none">
+        <h2> Results Summary </h2>
+        <div id="results-header">
+        </div>
+        <h3> Page   </h3>
+        <div id="results-container"></div>
+        <div id="pagination-controls" class="pagination-controls">
+            <button id="prev-page" disabled>Previous</button>
+            <span id="page-info"></span>
+            <button id="next-page" disabled>Next</button>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/js/tom-select.complete.min.js"></script>
     <script>
         // Function to fetch data from an API and populate dropdowns
         const tomSelectInstances = {}; // Object to store Tom Select instances
+        
+        // variables for pagination
+        let currentPage = 1;
+        let totalResults = 0;
+        let resultsPerPage = 0;  // Initialize but get it from the backend later
+
         async function populateDropdown(dropdownId, apiUrl) {
             try {
                 const response = await fetch(apiUrl);
@@ -100,28 +118,46 @@
             }
         }
 
-        // Function to send selected values to the backend API
+        // Function to send selected values to the backend API and get results
         async function sendSelectedValues() {
             const selectedValues = getSelectedValues();  // Get the selected values
 
+            console.log('made it')
             try {
-                const response = await fetch('/api/save-selections/', {  
+                const response = await fetch('/api/get-variables-from-selection/', {  
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
                     },
-                    body: JSON.stringify(selectedValues)  // Send the selected values as JSON
+                    body: JSON.stringify({selections:selectedValues, page:currentPage})  
                 });
+                if (!response.ok) throw new Error('Network response was not ok');
 
-                if (response.ok) {
-                    console.log('Selections saved successfully!');
-                } else {
-                    console.error('Failed to save selections:', response.statusText);
-                }
+                const data = await response.json();
+
+                totalResults = data.total; // Assume your API returns a total count
+                totalPages = data.total_pages  // get page size from backend
+                displayResults(data.html); // Function to display results
+                updatePagination(currentPage,totalPages);
             } catch (error) {
                 console.error('Error sending selected values:', error);
             }
         }
+
+         
+         // Function to grab selected values from all dropdowns in order to generate a query
+         function getSelectedValues() {
+            const dropdownIds = ['dd-loc','dd-col','dd-tave','dd-sname','dd-lname']
+            const selectedValues = {}; // Object to hold selected values for each dropdown
+             // Loop through each dropdown ID
+            dropdownIds.forEach(dropdownId => {
+                const tomSelectInstance = tomSelectInstances[dropdownId]; // Get the Tom Select instance
+                selectedValues[dropdownId] = tomSelectInstance.getValue(); // Store the selected values
+            });
+            return selectedValues;
+        }
+
 
         // Function to select all options in a dropdown
         function selectAllOptions(dropdownId) {
@@ -136,7 +172,6 @@
             console.log(`Selected values for ${dropdownId} after Select All:`, tomSelectInstance.getValue());
 
         }
-
 
         // Add event listeners for Select All buttons
         document.querySelectorAll('.select-all').forEach(button => {
@@ -170,8 +205,6 @@
             });
         });
 
-
-
         // Function to load all dropdowns
         function loadDropdowns() {
             populateDropdown('dd-tave', '/api/vocab-select?vocab=frequency');
@@ -182,10 +215,68 @@
         }
 
         // Refresh button to repopulate dropdowns
-        document.getElementById('refreshBtn').addEventListener('click', loadDropdowns);
+        //document.getElementById('refreshBtn').addEventListener('click', loadDropdowns);
+
+        // Add event listener for sending selected values
+        document.getElementById('sendSelectionsBtn').addEventListener('click', sendSelectedValues);
+
 
         // Call loadDropdowns on page initialization
         document.addEventListener('DOMContentLoaded', loadDropdowns);
+
+        // Function to display results in the container
+        function displayResults(html) {
+        const container = document.getElementById('results');
+        container.style.display="block";
+        const innerContainer = document.getElementById('results-container')
+        innerContainer.innerHTML = html; 
+        }
+
+
+
+        //results.forEach(result => {
+        //resultDiv.className = 'result-item';
+        // const resultDiv = document.createElement('div');
+        //    resultDiv.textContent = `Result: ${result}`; // Customize based on your result structure
+        //    container.appendChild(resultDiv);
+        //});
+        //}
+
+        // Function to update pagination controls
+        function updatePagination(currentPage, totalPages) {
+            document.getElementById('prev-page').disabled = currentPage === 1;
+            document.getElementById('next-page').disabled = currentPage === totalPages;
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+        }
+
+        // Event listeners for pagination buttons
+        document.getElementById('prev-page').addEventListener('click', function() {   
+            currentPage--;         
+            document.getElementById('sendSelectionsBtn').click(); // Trigger result fetch for new page
+            })
+
+
+        document.getElementById('next-page').addEventListener('click', function() {
+            currentPage++;
+            document.getElementById('sendSelectionsBtn').click(); // Trigger result fetch for new page
+        })
+
+
+        // Function to get CSRF token (if using Django)
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
 
 
     </script>
