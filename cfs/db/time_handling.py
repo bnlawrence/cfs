@@ -53,10 +53,11 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
     as well, if fix_coords is true, that too is fixed.
     """
 
-    # first error, hourly mean data written to the 1hr point file
+    
     try:
         frequency, iwrite, iop, tm, filename = get_frequency(field,handler=canari_v1ahandler)
     except ValueError as err:
+        # first error, hourly mean data written to the 1hr point file
         flux_in_wrong_file = 'm01s01i235'
         if field.nc_get_variable() == flux_in_wrong_file:
             # this field was erroneously put in the point file, but it is mean data.
@@ -65,7 +66,7 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
             iop = field.get_property('interval_operation','')
             iwrite = field.get_property('interval_write','')
         else:
-            # some of these were wrong in some simulations ... 
+            # second error, some of these were wrong in some simulations ... 
             if get_tm(field) == '' and field.get_property('online_operation','') == 'average':
                 if fix_meta:
                     iop = field.get_property('interval_operation','')
@@ -83,6 +84,7 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
                     frequency='unknown'
                 logger.warning(str(err))
     if fix_meta:
+        # third error, no frequency property in any output
         field.set_property('frequency',frequency)
         logger.info(f'Fixed frequency for {field.identity()} ({frequency})')
     else:
@@ -91,6 +93,7 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
     if frequency in ['fx','uknown']:
         return
     
+    # fourth error, for some data, offsets were not properly used.
     # Only looking for fields which are a 30 day mean sampled every 24 hours
     interval_operation = iop
     online_operation = field.get_property('online_operation','')
@@ -111,7 +114,7 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
         field.del_construct(k)
         field.set_construct(new_1)
         field.set_construct(new_2)
-        logger.info(f'Replaced time cell methodfor {field.identity()}')
+        logger.info(f'Replaced time cell method for {field.identity()}')
     else:
         logger.warning(f'Did not fix cell methods for {field.identity()}')
 
