@@ -8,6 +8,7 @@ urlpatterns = [
 
     #main search
     path("view",views.view,name="view"),
+    path("view1",views.view1,name="view1"),
 
     #main search
     path("oldview",views.oldview,name="oldview"),
@@ -21,6 +22,8 @@ urlpatterns = [
     #route for variable property queries (old version)
     path('api/variable-propertiesk/', views.get_variable_properties_by_key, name='get_variable_properties_by_key'),
     
+    path('api/vocab-select/', views.vocab_select, name='vocab_select'),
+    path('api/entity-select/', views.entity_select, name='entity_select'),
 
     # route for fetching available keys for variable property queries
     path('api/variable-property-keys/', views.get_available_keys, name='get_available_keys'),

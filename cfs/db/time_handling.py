@@ -53,7 +53,6 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
     as well, if fix_coords is true, that too is fixed.
     """
 
-    
     try:
         frequency, iwrite, iop, tm, filename = get_frequency(field,handler=canari_v1ahandler)
     except ValueError as err:
@@ -82,13 +81,20 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
                     frequency='fx'
                 else:
                     frequency='unknown'
-                logger.warning(str(err))
+                    logger.warning(str(err))
     if fix_meta:
-        # third error, no frequency property in any output
+        # third error, a number of issues with file metadata, documented here: https://github.com/NCAS-CMS/canari/issues/4
         field.set_property('frequency',frequency)
-        logger.info(f'Fixed frequency for {field.identity()} ({frequency})')
+        field.set_property('variant_label',field.get_property('variant_id'))
+        field.del_property('variant_id')
+        field.set_property('source_id', field.get_property('source_index'))
+        field.del_property('source_index')
+        field.set_property('parent_activity_id', field.get_property('parent_source_id'))
+        field.set_property('parent_source_id', field.get_property('source_id'))
+        logger.info(f'Fixed inherited file attributes for {field.identity()} ({frequency})')
+
     else:
-         logger.warning(f'Did not fix frequency for {field} (should be {frequency})')
+         logger.warning(f'Did not fix inherited file attributes for {field}.')
 
     if frequency in ['fx','uknown']:
         return

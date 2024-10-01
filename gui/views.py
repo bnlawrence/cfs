@@ -3,7 +3,8 @@ from django.http import HttpResponse
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-from cfs.models import VariableProperty, VariablePropertyKeys, Variable, Cell_Method
+from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
+                        Location, Collection)
 
 # Create your views here.
 
@@ -16,6 +17,9 @@ def view(request):
 
 def oldview(request):
     return render(request,'gui/view0.html')
+
+def view1(request):
+    return render(request,'gui/view1.html')
 
 ###
 ### API Rest queries follow
@@ -113,6 +117,22 @@ def get_view_initial_options(request):
     }
 
     return Response(initial_data)
+
+
+@api_view(['GET'])
+def vocab_select(request):
+    vocab = request.query_params.get('vocab')  # Do not accept multiple values
+    key = VariablePropertyKeys.mykey(vocab)
+    data = [{'id':v.id, 'name':v.value} for v in VariableProperty.objects.filter(key=key)]
+    return Response(data)
+
+@api_view(['GET'])
+def entity_select(request):
+    entity = request.query_params.get('entity')  # Do not accept multiple values
+    target = {'collection':Collection, 'location':Location}[entity]
+    data = [{'id':v.id, 'name':v.name} for v in target.objects.all()]
+    return Response(data)
+
 
 
 

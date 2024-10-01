@@ -22,10 +22,17 @@ class Cell_Method(models.Model):
     class Meta:
         app_label = 'cfs'
 
-    method = models.CharField(max_length=256)
+    method = models.CharField(max_length=64)
     axis = models.CharField(max_length=64)
+    qualifier = models.CharField(max_length=64, null=True)
+    intervals = models.CharField(max_length=64, null=True)
     def __str__(self):
-        return f"{self.axis} : {self.method}"
+        s = f"{self.axis} : {self.method}"
+        if self.qualifier:
+            s+=f' {self.qualifier}'
+        if self.intervals:
+            s+=f' ({self.intervals})'
+        return s
 
 class Cell_MethodSet(models.Model):
     """ 
@@ -400,9 +407,16 @@ class VariablePropertyKeys(models.TextChoices):
     LNAME = 'LN', "long_name"
     IDENT = 'ID', "identity"
     ATOMIC = 'AO', "atomic_origin"
+    FREQ = 'F', "frequency"
+    SOURCE = "S", "source"
+    SOURCE_ID = 'SI', "source id"
+    VARIANT = 'VL', "variant label"
+    REALM = "R", "realm"
+    EXPERIMENT = 'E', "experiment"
 
-    def mykey(self,myvalue):
-        reversed = {v:k for k,v in self.choices}
+    @classmethod
+    def mykey(cls,myvalue):
+        reversed = {v:k for k,v in cls.choices}
         return reversed[myvalue]
 
 class VariableProperty(models.Model):

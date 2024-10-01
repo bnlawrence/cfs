@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tom Select Example</title>
+    {% load static %} 
+    <link href="{% static 'gui/css/styles.css' %}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/css/tom-select.css" rel="stylesheet">
+</head>
+<body>
+    <h1>CANARI Data Selection</h1>
+
+    <div id="selection-boxes">
+        <table>
+            <tr><td><label for="dd-loc">Storage Location:</label></td>
+                <td><label for="dd-col">In collection:</label></td>
+                <td>Filter by location and collection </td>
+            </tr><tr>
+                <td><select id="dd-loc" placeholder="Select an option..." class="dropdown"></select></td>
+                <td><select id="dd-col" placeholder="Select an option..." class="dropdown"></select></td>
+                <td>Do filter button </td>
+            </tr><tr>
+                <td><label for="dd-tave">Time Averaging:</label>
+                    <button class="select-all" data-dropdown="dd-tave">Select All</button>
+                    <button class="clear-selection" data-dropdown="dd-tave">Clear Selection</button>
+                </td>
+                <td> <label for="dd-sname">Standard Name:</label>
+                    <button class="select-all" data-dropdown="dd-sname">Select All</button>
+                    <button class="clear-selection" data-dropdown="dd-sname">Clear Selection</button></td>
+                <td><label for="dd-lname">Long Name:</label>
+                    <button class="select-all" data-dropdown="dd-lname">Select All</button>
+                    <button class="clear-selection" data-dropdown="dd-lname">Clear Selection</button>
+                </td>
+            </tr><tr>
+                <td><select id="dd-tave" placeholder="Select an option..." class="dropdown"></select></td>
+                <td><select id="dd-sname" placeholder="Select an option..." class="dropdown"></select></td>
+                <td><select id="dd-lname" placeholder="Select an option..." class="dropdown"></select></td>
+            </tr>
+        </table>
+    </div>
+
+    <button id="refreshBtn">Refresh Lists</button>
+    <button id="sendSelectionsBtn">Send Selections</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/js/tom-select.complete.min.js"></script>
+    <script>
+        // Function to fetch data from an API and populate dropdowns
+        const tomSelectInstances = {}; // Object to store Tom Select instances
+        async function populateDropdown(dropdownId, apiUrl) {
+            try {
+                const response = await fetch(apiUrl);
+                const data = await response.json();
+
+                // Assuming the response is a list or an array of options
+                const options = data.results || data;  // Adjust based on API structure
+                if (!Array.isArray(options)) {
+                    throw new Error('Expected an array, got something else');
+                }
+
+                // Initialize or update Tom Select with new options
+                const selectElement = document.getElementById(dropdownId);
+                const selectedValues = Array.from(selectElement.selectedOptions).map(option => option.value); // Save current selections
+
+                // Clear existing options
+                selectElement.innerHTML = '';
+
+                // Add new options from the API response
+                options.forEach(item => {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.text = item.name;
+                    selectElement.appendChild(option);
+                });
+
+                // Initialize or update Tom Select instance only after populating the options
+                if (tomSelectInstances[dropdownId]) {
+                    // If the instance already exists, just update its options
+                    const tomSelectInstance = tomSelectInstances[dropdownId];
+                    tomSelectInstance.clear();  // Clear current selection
+                    tomSelectInstance.addOptions(options.map(item => ({
+                        value: item.id,
+                        text: item.name
+                    }))); // Add new options
+                    tomSelectInstance.setValue(selectedValues);  // Restore previous selection
+                } else {
+                    // Create a new Tom Select instance if it doesn't exist
+                    tomSelectInstances[dropdownId] = new TomSelect(selectElement, {
+                        valueField: 'id', 
+                        labelField: 'name',
+                        searchField: 'name',
+                        plugins: ['remove_button'],  // Plugin for removing selected options
+                        maxItems: null  // Allow unlimited selections (for multiple select)
+                });
+                tomSelectInstances[dropdownId].setValue(selectedValues);  // Restore previous selection
+            }
+               
+            } catch (error) {
+                console.error(`Failed to fetch data for ${dropdownId}:`, error);
+            }
+        }
+
+        // Function to send selected values to the backend API
+        async function sendSelectedValues() {
+            const selectedValues = getSelectedValues();  // Get the selected values
+
+            try {
+                const response = await fetch('/api/save-selections/', {  
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(selectedValues)  // Send the selected values as JSON
+                });
+
+                if (response.ok) {
+                    console.log('Selections saved successfully!');
+                } else {
+                    console.error('Failed to save selections:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error sending selected values:', error);
+            }
+        }
+
+        // Function to select all options in a dropdown
+        function selectAllOptions(dropdownId) {
+            const tomSelectInstance = document.getElementById(dropdownId).tomselect;
+            // Convert the options object into an array of option values
+            const allOptionValues = Object.keys(tomSelectInstance.options).map(key => tomSelectInstance.options[key].id);
+            tomSelectInstance.setValue(allOptionValues); // Set all values
+             // Manually refresh the Tom Select instance to ensure the UI reflects the selections
+            console.log(`Got ${allOptionValues}`)
+            tomSelectInstance.refreshOptions(false); // Refresh without clearing selections
+             // Log the selected values to confirm
+            console.log(`Selected values for ${dropdownId} after Select All:`, tomSelectInstance.getValue());
+
+        }
+
+
+        // Add event listeners for Select All buttons
+        document.querySelectorAll('.select-all').forEach(button => {
+            button.addEventListener('click', (event) => {
+                const dropdownId = event.target.getAttribute('data-dropdown');
+                const tomSelectInstance = tomSelectInstances[dropdownId];
+
+                if (tomSelectInstance) {
+                    const allOptionValues = Object.keys(tomSelectInstance.options).map(key => tomSelectInstance.options[key].id);
+                    tomSelectInstance.setValue(allOptionValues);
+                    tomSelectInstance.refreshOptions(false);
+                    console.log(`Selected all options for ${dropdownId}`);
+                }
+            });
+        });
+
+        
+        // Add event listeners for "Clear Selection" buttons
+        document.querySelectorAll('.clear-selection').forEach(button => {
+            button.addEventListener('click', function () {
+                const dropdownId = button.getAttribute('data-dropdown');
+                const tomSelectInstance = tomSelectInstances[dropdownId]; // Use the stored instance
+
+                if (tomSelectInstance) {
+                    tomSelectInstance.clear(); // Clear selections
+                    tomSelectInstance.refreshOptions(false); // Refresh options without clearing selections
+                    console.log(`Cleared selections for ${dropdownId}`);
+                } else {
+                    console.error(`TomSelect instance for ${dropdownId} not found.`);
+                }
+            });
+        });
+
+
+
+        // Function to load all dropdowns
+        function loadDropdowns() {
+            populateDropdown('dd-tave', '/api/vocab-select?vocab=frequency');
+            populateDropdown('dd-sname', '/api/vocab-select?vocab=standard_name');
+            populateDropdown('dd-lname', '/api/vocab-select?vocab=long_name');
+            populateDropdown('dd-loc', '/api/entity-select?entity=location');
+            populateDropdown('dd-col', '/api/entity-select?entity=collection');
+        }
+
+        // Refresh button to repopulate dropdowns
+        document.getElementById('refreshBtn').addEventListener('click', loadDropdowns);
+
+        // Call loadDropdowns on page initialization
+        document.addEventListener('DOMContentLoaded', loadDropdowns);
+
+
+    </script>
+</body>
+</html>

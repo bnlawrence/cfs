@@ -166,7 +166,7 @@ def test_creating_variable_with_properties(test_data):
 
 def test_retrieving_by_property_keys(test_data):
     test_db, f, c  = test_data
-    variables = test_db.variable.retrieve_by_key('experiment','mytest')
+    variables = test_db.variable.retrieve_by_key('institution','Narnia')
     assert len(variables) == 1
 
 def test_cell_methods_create(test_data):

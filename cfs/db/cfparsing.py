@@ -124,10 +124,13 @@ def parse_fields_todict(fields, lookup_xy=None, cfa=False):
         if cfa:
             description['manikey'] = cfahandler.parse_field_to_manifest(v)
         properties = v.properties()
-        for k in ['standard_name','long_name','realm']:
+        for k in ['standard_name','long_name','realm','source_id','frequency',
+                  'source','variant_label','experiment']:
             description[k] = v.get_property(k,None)
             if description[k] is not None:
                 properties.pop(k)
+            else:
+                description.pop(k)
         t2 = time()
         description['time_domain'] = lookup_t.extract_cfstemporal(v)   
         t3 = time()
@@ -136,8 +139,11 @@ def parse_fields_todict(fields, lookup_xy=None, cfa=False):
         cmlist = []
         for m, cm in v.cell_methods().items():
             for a in cm.get_axes():
-                method = cm.get_method()
-                cmlist.append((a,method))
+                if hasattr(cm,'intervals'):
+                    intervals = cm.intervals
+                else:
+                    intervals=None
+                cmlist.append((a,cm.get_method(),cm.qualifiers(),intervals))
         description['cell_methods'] = cmlist
         description['_proxied'] = {k:manage_types(v) for k,v in properties.items()}
         descriptions.append(description)
