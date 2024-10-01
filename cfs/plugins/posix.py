@@ -34,7 +34,8 @@ class Posix:
         subcollections=False,
         checksum=None,
         regex='*.nc',
-        intent='S'
+        intent='S',
+        fixer=None
     ):
         """
         Add a new collection with all netcdf files below a particular path.
@@ -53,6 +54,7 @@ class Posix:
         : intent : a single letter which should correspond to the intended type of collection, which should represent
                  whether or not the collection consists of atomic datasets, quarks, or standalone files.
                  (A, Q, S).
+        : fixer : a function which can be applied to fields to fix metadata
         """
         # Require a unique collection name here
         try:
@@ -119,8 +121,7 @@ class Posix:
                     #ppd = self.db.collection_retrieve(pd)
                     self.db.relationship.add_double(pd,cc.name,'parent_of','subdir_of')
         logger.info('Before call')
-        msg = cfupload_ncfiles(self.db, self.location, c, dbfiles, intent, cfa=cfa)
-        logger.info(msg)
+        cfupload_ncfiles(self.db, self.location, c, dbfiles, intent, cfa=cfa, fixer=fixer)
      
 
 def file2dict(p, parents, checksum=None):

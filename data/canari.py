@@ -5,7 +5,7 @@ import os
 from django import setup
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.settings')
 setup()
-
+from cfs.db.time_handling import check_for_canari_metadata_issues
 
 from cfs.plugins.posix import Posix
 ##setup_django(db_file=dbfile, migrations_location=migrations_location)
@@ -26,7 +26,8 @@ def load(P, cname, restart=True):
                 cname,
                  "One of the CANARI atmospheric aggregation files",
                  regex='*.cfa',
-                 intent='C'
+                 intent='C',
+                 fixer = check_for_canari_metadata_issues,
     )
     t1 = time()-t0
     print(f'Canari load took {t1:.2f}s')

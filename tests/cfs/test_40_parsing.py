@@ -75,7 +75,7 @@ def test_atomic_name(inputfield):
 
 def test_field_parsing(inputfield):
 
-    adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_xy=None)[0][0]
+    adict = parse_fields_todict([inputfield], lookup_xy=None)[0][0]
     assert adict['identity'] == 'specific_humidity'
     assert 'units' in adict['_proxied']
     assert adict['time_domain']['interval'] == 1
@@ -91,7 +91,7 @@ def test_upload_parsed_dict(inputfield, test_db):
     l = test_db.location.create('parloc')
     c = test_db.collection.create(name='parcol')
  
-    adict = parse_fields_todict([inputfield], temporal_resolution=None, lookup_xy=None)[0][0]
+    adict = parse_fields_todict([inputfield],  lookup_xy=None)[0][0]
     adict['identity'] = 'special test var'
     
     filedata={'properties':file_properties, 'variables':[adict,]}

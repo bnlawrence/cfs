@@ -1,6 +1,4 @@
-
-import cf
-import h5netcdf as h5
+from cfs.db.time_handling import LookupT
 import numpy as np
 from cfs.db.cfa_tools import CFAhandler
 from time import time
@@ -54,83 +52,6 @@ class LookupXY:
         else:
             raise AttributeError(f"'{self.__class__.__name__}' has no information about '{key}'")
 
-class LookupT:
-    def __init__(self):
-        self.inferred = {}
-        self.bounds = {}
-
-    def extract_cfstemporal(self, field, temporal_resolution=None):
-        """ Extract the information needed for a CFS temporal domain.
-        : field : a normal CF field
-        : temporal_resolution : A tuple (interval, interval_units) (e.g 1,'mon')
-                which should be used for the time domain. If not provided,
-                it is inferred from the data
-        """
-        try:
-            tdim = field.dimension_coordinate('T')
-        except ValueError:
-            # fixed data not valid at any time
-            return {}
-        
-        ncvar = tdim.nc_get_variable(default=None)
-        data = tdim.data
-        if ncvar is None:
-            bounds = float(data[0].array[0]),float(data[-1].array[0])
-        else:
-            if ncvar not in self.bounds:
-                bounds = float(data[0].array[0]),float(data[-1].array[0])
-                self.bounds[ncvar] = bounds
-            else:
-                bounds = self.bounds[ncvar]
-
-        if temporal_resolution is None:
-            if ncvar not in self.inferred:
-                delta = (tdim[2].data-tdim[0].data)/2
-                interval, interval_units = self.infer_temporal_resolution(tdim, delta)
-                if ncvar is not None: 
-                    self.inferred[ncvar] = interval, interval_units
-            else:
-                interval, interval_units = self.inferred[ncvar]
-        else:
-            interval, interval_units = temporal_resolution
-
-        return {'interval':interval, 'interval_units':interval_units,'starting':bounds[0],
-                'ending': bounds[1], 'units':tdim.units, 'calendar':tdim.calendar}
-    
-    def infer_temporal_resolution(self,tdim, delta):
-        """
-        Guess temporal resolution from cell spacing.
-        : tdim : a cf time dimension coordinate construct 
-        Will likely need fixing when we confront it with real data from the wild. 
-        Thanks in advance David!
-        """
-        delta.Units = cf.Units('day')
-        if delta < cf.TimeDuration(1,'day'):   #hours
-            delta.Units = cf.Units('hour')
-            return int(delta),'h'
-        elif delta < cf.TimeDuration(28,'day'): 
-            return int(delta),'d'
-        elif delta < cf.TimeDuration(31,'day'):
-            return 1,'m'
-        elif delta> cf.TimeDuration(89,'day') and delta < cf.TimeDuration(93,'day'):
-            return 3,'m'
-        elif delta> cf.TimeDuration(359,'day') and delta < cf.TimeDuration(367,'day'): 
-            return 1,'y'
-        else:
-            if tdim.calendar == '360_day':
-                return int(delta/360),'y'
-            else:
-                return int(delta/360.25),'y'
-            
-    def infer_interval_from_coord(self, tdim):
-        """ 
-        For use where we are not looping over
-        fields, directly infer time interval from a
-        temporal dimension coordinate
-        """
-        delta = (tdim[2].data-tdim[0].data)/2
-        return self.infer_temporal_resolution(tdim, delta)
-        
 
 
 
@@ -179,13 +100,10 @@ def extract_cfsdomain(field, lookup_xy=LookupXY):
     return domain_properties
 
 
-def parse_fields_todict(fields, temporal_resolution=None, lookup_xy=None, cfa=False):
+def parse_fields_todict(fields, lookup_xy=None, cfa=False):
     """
     Parse a list of cf-python fields into a list of properties suitable for loading into the database.
     : fields : a list of cf fields
-    : temporal_resolution : either a known temporal resolution in the form n{h,d,m,y} or None.
-            if none, we will infer temporal resolution by inspecting the time coordinate if 
-            it exists.
     : lookup_class : optional. see description in cfparse_field_for_domain
     : cfa : True if aggregated fields
     : returns : a list of dictionaries of metadata properties describing
@@ -211,7 +129,7 @@ def parse_fields_todict(fields, temporal_resolution=None, lookup_xy=None, cfa=Fa
             if description[k] is not None:
                 properties.pop(k)
         t2 = time()
-        description['time_domain'] = lookup_t.extract_cfstemporal(v, temporal_resolution)   
+        description['time_domain'] = lookup_t.extract_cfstemporal(v)   
         t3 = time()
         description['spatial_domain'] = extract_cfsdomain(v, lookup_xy)
         t4 = time()

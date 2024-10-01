@@ -362,16 +362,26 @@ class Tag(models.Model):
     name = models.CharField(max_length=64)
 
 class TimeDomain(models.Model):
-
+    """ 
+    Represents the domain of sampling
+    """
     class Meta:
         app_label = 'cfs'
     
+    # sampling interval
     interval =  models.PositiveIntegerField()
+    # offset
+    interval_offset = models.PositiveIntegerField(null=True)
+    # interval units
     interval_units = models.CharField(max_length=3,default='d')
+
+    # date units and calendar
     units = models.CharField(max_length=12,default='days')
     calendar = models.CharField(max_length=12, default="standard")
+    # start and end dates
     starting = models.FloatField()
     ending = models.FloatField()
+  
     
     def resolution(self):
         return f'{self.interval} {self.units}'

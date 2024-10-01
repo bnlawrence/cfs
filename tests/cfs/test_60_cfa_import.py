@@ -4,9 +4,8 @@ from pathlib import Path
 import numpy as np
 import os
 
-import logging
-
 from cfs.db.standalone import setup_django
+
 
 VARIABLE_LIST = ['specific_humidity',]
 
@@ -189,6 +188,11 @@ def test_deletion(django_dependencies):
     
     frags = test_db.file.findall_by_type('F')
     assert frags.count() == 0
+
+
+   
+    
+
 
    
 

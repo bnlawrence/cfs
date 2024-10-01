@@ -9,6 +9,7 @@ setup(
     scripts=[], 
     install_requires = [
         'django',
+        'djangorestframework',
         'click',
         'rich',
         'tqdm',
