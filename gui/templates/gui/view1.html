@@ -45,17 +45,47 @@
 
     <button id="sendSelectionsBtn">Search</button>
 
-    <div id="results" class="results-block" style="display:none">
-        <h2> Results Summary </h2>
-        <div id="results-header">
-        </div>
-        <h3> Page   </h3>
-        <div id="results-container"></div>
+    <div id="message-block"></div>
+    <div id="results" class="results-block" style="display:none;">
+        <h2> Selection </h2>
+        <div class="fullwidth">
+           
+            <div id="results-header" class="leftblock">
+                
+                <div class="block-container">
+                <h4> Summary </h4>
+                <div id="summary-content"></div>
+                </div>
+            </div>
+            <div id="action-area" class="rightblock">
+                <div class="block-container">
+                    <h4>Add to Collection</h4>
+                    <form id="anotherForm">
+                        <div class="form-group">
+                            <label for="inputText">Collection Name:</label>
+                            <input type="text" id="inputText1" required>
+                        </div>
+                        <button type="submit">Add</button>
+                    </form>
+                </div>
+                <div class="block-container">
+                    <h4>Download Manifest</h4>
+                    <form id="anotherForm">
+                        <div class="form-group">
+                            <label for="inputText">Manifest FileName:</label>
+                            <input type="text" id="inputText2" required>
+                        </div>
+                        <button type="submit">Download</button>
+                    </form>
+                </div>
+            </div>
+        </div> 
         <div id="pagination-controls" class="pagination-controls">
             <button id="prev-page" disabled>Previous</button>
             <span id="page-info"></span>
             <button id="next-page" disabled>Next</button>
         </div>
+        <div id="results-container"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/js/tom-select.complete.min.js"></script>
@@ -141,27 +171,33 @@
         async function sendSelectedValues() {
             const selectedValues = getSelectedValues();  // Get the selected values
             try {
-                const response = await fetch('/api/get-variables-from-selection/', {  
+                // Fetch both summary and paginated data (depending on currentPage)
+                const response = await fetch('/api/get-variables-from-selection/', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': getCookie('csrftoken')
                     },
-                    body: JSON.stringify({selections:selectedValues, page:currentPage})  
+                    body: JSON.stringify({ selections: selectedValues, page: currentPage })
                 });
+        
                 if (!response.ok) throw new Error('Network response was not ok');
-
                 const data = await response.json();
-
-                totalResults = data.total; // Assume your API returns a total count
-                totalPages = data.total_pages  // get page size from backend
-                displayResults(data.html); // Function to display results
-                updatePagination(currentPage,totalPages);
+        
+                // Process paginated data
+                totalResults = data.total;  // Get total results
+                totalPages = data.total_pages;  // Get total pages from backend
+                displayResults(data.html);  // Display the paginated results
+                updatePagination(currentPage, totalPages);  // Update pagination controls
+                // Only update the summary if it's present in the response (i.e., page 1)
+                if (data.summary) {
+                    document.getElementById('summary-content').innerHTML = data.summary;
+                }
+                
             } catch (error) {
                 console.error('Error sending selected values:', error);
             }
         }
-
          
         // Function to grab selected values from all dropdowns in order to generate a query
          function getSelectedValues() {
@@ -244,10 +280,10 @@
 
         // Function to display results in the container
         function displayResults(html) {
-        const container = document.getElementById('results');
-        container.style.display="block";
-        const innerContainer = document.getElementById('results-container')
-        innerContainer.innerHTML = html; 
+            const container = document.getElementById('results');
+            container.style.display="block";
+            const innerContainer = document.getElementById('results-container')
+            innerContainer.innerHTML = html; 
         }
 
         // Function to update pagination controls

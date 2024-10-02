@@ -2,8 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import CharField, F
-from django.db.models.functions import Concat
+from django.db.models import Count
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -172,7 +171,19 @@ def select_variables(request):
     results = (results
                 .order_by('key_properties', 'id')  # First order by property value, then by id
                 )
-
+    if page_number == 1:
+        n = results.count()
+        sdata = results.aggregate(
+            nspatial=Count('spatial_domain', distinct=True),
+            ntime=Count('time_domain', distinct=True)
+            )
+        summary = f'<p>Total Results {n}. Includes <ul>'
+        summary += f"<li>{sdata['nspatial']} unique spatial domains, and </li>"
+        summary += f"<li>{sdata['ntime']} unique time domain(s).</li></ul>"
+        #not enough work for a template
+    else:
+        summary=''
+        
     # Paginate results using vanilla django pagination, the DRF one didnt' work
     paginator = Paginator(results, 10)
 
@@ -194,12 +205,18 @@ def select_variables(request):
     print('page',page_results.number,' of ', paginator.num_pages)
     #Return the rendered HTML along with pagination info
     
-    return JsonResponse({
+    myresponse = {
+        
         'html': html,
         'total': paginator.count,  # Total count of results
         'page': page_results.number,  # Current page
         'total_pages': paginator.num_pages  # Total number of pages
-    })
+    }
+    if summary:
+        myresponse['summary'] = summary
+
+    return JsonResponse(myresponse)
+
 
   
 
