@@ -585,6 +585,34 @@ class TimeInterface(GenericHandler):
         return td
    
 
+class VariableProperyInterface:
+    """ 
+    Used only in the GUI front end to provide choice sets of variables
+    """
+    @classmethod
+    def filter_properties(cls, keylist=[], collection_ids=[], location_ids=[]):
+        """ 
+        Generate a subset of properties depending on whether or
+        not the properties belong to variables in a colletion, and
+        whether or not they are stored in location.
+        """
+        print(keylist, collection_ids, location_ids)
+        try:
+            result = VariableProperty.objects.all()
+            if collection_ids:
+                collections = Collection.objects.filter(id__in=collection_ids)
+                result = result.filter(variable__contained_in__in=collections).distinct()
+            if keylist:
+                result = result.filter(key__in=keylist)
+            if location_ids:
+                print('Not implemented in variablepropertyinterface')  #FIXME
+            return result.all()
+        except Exception as err:
+            print(str(err))
+            return VariableProperty.objects.all()
+       
+
+
 class VariableInterface(GenericHandler):
     def __init__(self):
         super().__init__(Variable)

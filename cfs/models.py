@@ -435,6 +435,35 @@ class VariableProperty(models.Model):
         return f'{self.key}:{self.value}'
 
 
+class VariablePropertySet(models.Model):
+    """ 
+    Provides a single view of all the properties associated with a 
+    variable. We need this to simplify concepts of uniqueness, and 
+    improve performance in filtering variables on sets of properties.
+    """
+    properties = models.ManyToManyField(VariableProperty)
+    key = models.CharField(max_length=64, unique=True)
+
+    def __str__(self):
+        return ','.join([str(prop) for prop in self.properties.all()])
+
+    @staticmethod
+    def generate_key(properties):
+        """Generate a unique key (e.g., hash) for a list of property ids."""
+        property_ids = sorted([str(prop.id) for prop in properties])
+        key_string = ",".join(property_ids)
+        return hashlib.md5(key_string.encode('utf-8')).hexdigest()
+
+    @classmethod
+    def get_or_create_from_properties(cls, properties):
+        """Retrieve or create a VariablePropertySet based on the list of properties."""
+        key = cls.generate_key(properties)
+        property_set, created = cls.objects.get_or_create(key=key)
+        if created:
+            property_set.properties.set(properties)  # Set properties if it's a new VariablePropertySet
+        return property_set
+
+
 class Variable(models.Model):
     """
     Holds the logic for atomic dataset handling, including building up an atomic
@@ -471,7 +500,7 @@ class Variable(models.Model):
 
     id = models.AutoField(primary_key=True)
     _proxied = models.JSONField()
-    key_properties = models.ManyToManyField(VariableProperty)
+    property_set = models.ForeignKey(VariablePropertySet,on_delete=models.SET_NULL)
     spatial_domain = models.ForeignKey(Domain, null=True,on_delete=models.SET_NULL)
     time_domain = models.ForeignKey(TimeDomain, null=True, on_delete=models.SET_NULL)
     cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.SET_NULL)

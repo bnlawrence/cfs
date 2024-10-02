@@ -15,13 +15,16 @@
         <table>
             <tr><td><label for="dd-loc">Storage Location:</label></td>
                 <td><label for="dd-col">In collection:</label></td>
-                <td>Filter by location and collection </td>
+                <td align="center">Filter by location and collection </td>
             </tr><tr>
                 <td><select id="dd-loc" placeholder="Select an option..." class="dropdown"></select></td>
                 <td><select id="dd-col" placeholder="Select an option..." class="dropdown"></select></td>
-                <td>Do filter button </td>
-            </tr><tr>
-                <td><label for="dd-tave">Time Averaging:</label>
+                <td align="center"><button id="first-filter">Do Filter</button> </td>
+            </tr>
+        <table>
+        <table>
+                <tr>
+                    <td><label for="dd-tave">Time Averaging:</label>
                     <button class="select-all" data-dropdown="dd-tave">Select All</button>
                     <button class="clear-selection" data-dropdown="dd-tave">Clear Selection</button>
                 </td>
@@ -40,7 +43,7 @@
         </table>
     </div>
 
-    <button id="sendSelectionsBtn">Send Selections</button>
+    <button id="sendSelectionsBtn">Search</button>
 
     <div id="results" class="results-block" style="display:none">
         <h2> Results Summary </h2>
@@ -118,11 +121,25 @@
             }
         }
 
+        async function filterDropdowns() {
+            // get the location and collection information
+            const selectedLoc = tomSelectInstances['dd-loc'] ? tomSelectInstances['dd-loc'].getValue() : null;
+            const selectedCol = tomSelectInstances['dd-col'] ? tomSelectInstances['dd-col'].getValue() : null;
+
+            // Create the extra query parameters based on selections
+            const extraParams = 
+                (Array.isArray(selectedLoc) && selectedLoc.length ? `&location=${selectedLoc.join(',')}` : '') +
+                (Array.isArray(selectedCol) && selectedCol.length ? `&collection=${selectedCol.join(',')}` : '');
+
+            populateDropdown('dd-tave', `/api/vocab-select?vocab=frequency${extraParams}`);
+            populateDropdown('dd-sname', `/api/vocab-select?vocab=standard_name${extraParams}`);
+            populateDropdown('dd-lname', `/api/vocab-select?vocab=long_name${extraParams}`);
+
+        }
+
         // Function to send selected values to the backend API and get results
         async function sendSelectedValues() {
             const selectedValues = getSelectedValues();  // Get the selected values
-
-            console.log('made it')
             try {
                 const response = await fetch('/api/get-variables-from-selection/', {  
                     method: 'POST',
@@ -146,7 +163,7 @@
         }
 
          
-         // Function to grab selected values from all dropdowns in order to generate a query
+        // Function to grab selected values from all dropdowns in order to generate a query
          function getSelectedValues() {
             const dropdownIds = ['dd-loc','dd-col','dd-tave','dd-sname','dd-lname']
             const selectedValues = {}; // Object to hold selected values for each dropdown
@@ -157,7 +174,6 @@
             });
             return selectedValues;
         }
-
 
         // Function to select all options in a dropdown
         function selectAllOptions(dropdownId) {
@@ -173,6 +189,9 @@
 
         }
 
+        // Add event listener for Do Filter button
+        document.getElementById('first-filter').addEventListener('click', filterDropdowns);    
+
         // Add event listeners for Select All buttons
         document.querySelectorAll('.select-all').forEach(button => {
             button.addEventListener('click', (event) => {
@@ -187,7 +206,6 @@
                 }
             });
         });
-
         
         // Add event listeners for "Clear Selection" buttons
         document.querySelectorAll('.clear-selection').forEach(button => {
@@ -231,16 +249,6 @@
         const innerContainer = document.getElementById('results-container')
         innerContainer.innerHTML = html; 
         }
-
-
-
-        //results.forEach(result => {
-        //resultDiv.className = 'result-item';
-        // const resultDiv = document.createElement('div');
-        //    resultDiv.textContent = `Result: ${result}`; // Customize based on your result structure
-        //    container.appendChild(resultDiv);
-        //});
-        //}
 
         // Function to update pagination controls
         function updatePagination(currentPage, totalPages) {

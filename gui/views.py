@@ -2,12 +2,15 @@ from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.db.models import CharField, F
+from django.db.models.functions import Concat
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
 
 from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
                         Location, Collection)
+from cfs.db.interface import VariableProperyInterface
 #from gui.serializers import VariableSerializer
 
 # Create your views here.
@@ -126,8 +129,17 @@ def get_view_initial_options(request):
 @api_view(['GET'])
 def vocab_select(request):
     vocab = request.query_params.get('vocab')  # Do not accept multiple values
+    loc = request.query_params.get('location',[])
+    col = request.query_params.get('collection',[])
     key = VariablePropertyKeys.mykey(vocab)
-    data = [{'id':v.id, 'name':v.value} for v in VariableProperty.objects.filter(key=key)]
+    if loc:
+        loc = loc.split(',')
+    if col:
+        col = col.split(',')
+    data = [{'id':v.id, 'name':v.value} for v in 
+            VariableProperyInterface.filter_properties(keylist=[key],
+                                                       collection_ids=col,
+                                                       location_ids=loc)]
     return Response(data)
 
 @api_view(['GET'])
@@ -143,9 +155,24 @@ def select_variables(request):
     page_number = request.data.get('page')  # Default to page 1
     print(selections, page_number)
 
-    # Paginate results using vanilla django pagination, the DRF one didnt' work
-
+    # they both exist in the same db list ... 
+    properties = set(selections['dd-sname'])|set(selections['dd-lname'])
+    print(properties)
     results = Variable.objects.all()  
+    if properties:
+        results=results.filter(key_properties__id__in=properties)
+    if selections['dd-tave']:
+        results=results.filter(time_domain__id__in=selections['dd-tave'])
+
+    print(f'Before ordering and distinction we have {results.count()} variables')
+    # We need to order the results, so we're doing it this way:
+    results = (results
+                .annotate(property_values=Concat(*[F('key_properties__value')], output_field=CharField()))
+                .distinct()
+                .order_by('property_values', 'id')  # First order by property value, then by id
+                )
+
+    # Paginate results using vanilla django pagination, the DRF one didnt' work
     paginator = Paginator(results, 10)
 
     try:
