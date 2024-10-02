@@ -11,7 +11,7 @@ from rest_framework.decorators import api_view
 from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
                         Location, Collection)
 from cfs.db.interface import VariableProperyInterface
-#from gui.serializers import VariableSerializer
+from gui.serializers import VariableSerializer
 
 # Create your views here.
 
@@ -128,9 +128,14 @@ def get_view_initial_options(request):
 
 @api_view(['GET'])
 def vocab_select(request):
+    """ 
+    Get a vocabulary for use in drop downs. Optinally filter the
+    vocabulary to only show the options given some other constraint.
+    """
     vocab = request.query_params.get('vocab')  # Do not accept multiple values
     loc = request.query_params.get('location',[])
     col = request.query_params.get('collection',[])
+    
     key = VariablePropertyKeys.mykey(vocab)
     if loc:
         loc = loc.split(',')
@@ -156,20 +161,16 @@ def select_variables(request):
     print(selections, page_number)
 
     # they both exist in the same db list ... 
-    properties = set(selections['dd-sname'])|set(selections['dd-lname'])
-    print(properties)
+    properties = set(selections['dd-sname'])|set(selections['dd-lname'])|set(selections['dd-tave'])
     results = Variable.objects.all()  
     if properties:
-        results=results.filter(key_properties__id__in=properties)
-    if selections['dd-tave']:
-        results=results.filter(time_domain__id__in=selections['dd-tave'])
+        results=results.filter(key_properties__properties__id__in=properties)
+    
 
     print(f'Before ordering and distinction we have {results.count()} variables')
     # We need to order the results, so we're doing it this way:
     results = (results
-                .annotate(property_values=Concat(*[F('key_properties__value')], output_field=CharField()))
-                .distinct()
-                .order_by('property_values', 'id')  # First order by property value, then by id
+                .order_by('key_properties', 'id')  # First order by property value, then by id
                 )
 
     # Paginate results using vanilla django pagination, the DRF one didnt' work
@@ -184,10 +185,15 @@ def select_variables(request):
         # If page_number is out of range (e.g. 9999), deliver the last page of results.
         page_results = paginator.page(paginator.num_pages)
 
-    html = render_to_string('gui/variable.html', {'results': page_results})
+    serializer = VariableSerializer(page_results, many=True)
+    
+    print(serializer.data)
 
-    #print('page',page_results.number,' of ', paginator.num_pages)
-    # Return the rendered HTML along with pagination info
+    html = render_to_string('gui/variable.html', {'results': serializer.data})
+
+    print('page',page_results.number,' of ', paginator.num_pages)
+    #Return the rendered HTML along with pagination info
+    
     return JsonResponse({
         'html': html,
         'total': paginator.count,  # Total count of results

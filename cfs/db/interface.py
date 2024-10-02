@@ -633,7 +633,7 @@ class VariableInterface(GenericHandler):
         for key in varprops:
             if key in VariablePropertyKeys.labels:
                 ekey = self.varprops[key]
-                out_value, create = VariableProperty.objects.get_or_create(
+                out_value, _ = VariableProperty.objects.get_or_create(
                                         key=ekey, value=varprops[key])
                 definition['key_properties'].append(out_value)
             elif key == 'spatial_domain':
@@ -696,7 +696,7 @@ class VariableInterface(GenericHandler):
         for key,value in queries:
             #print('Query step', key, value)
             if key == 'key_properties':
-                base = base.filter(key_properties=value)
+                base = base.filter(key_properties__properties__in=value)
             elif key in ["spatial_domain","temporal_domain"]:
                 base = base.filter(**{key:value})
             elif key == 'in_file':
@@ -790,17 +790,12 @@ class VariableInterface(GenericHandler):
                     for x in v:
                         cm = self.cellm.retrieve(x)
                         queries.append(('cell_methods', cm))
-
         properties = self._construct_properties(properties)
         for present in ['_proxied','key_properties','cell_methods']:
             if not properties[present]:
                 properties.pop(present)
         for k, v in properties.items():
-            if k == 'key_properties':
-                for vv in v:
-                    queries.append((k,vv))
-            else:
-                queries.append((k,v))
+            queries.append((k,v))
         results = self.retrieve_by_queries(queries, from_collection=from_collection)
         if unique:
             if len(results) > 1:

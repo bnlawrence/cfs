@@ -461,7 +461,7 @@ class VariablePropertySet(models.Model):
         property_set, created = cls.objects.get_or_create(key=key)
         if created:
             property_set.properties.set(properties)  # Set properties if it's a new VariablePropertySet
-        return property_set
+        return property_set, created
 
 
 class Variable(models.Model):
@@ -472,11 +472,10 @@ class Variable(models.Model):
     """
     class Meta:
         app_label = 'cfs'
-        #constraints = [
-        #    UniqueConstraint(fields=['_proxied','spatial_domain', 'time_domain', 'cell_methods', 'in_file','in_manifest'], 
-        #                     name='unique_combination_of_fk_fields')
-        #]  # We can't include key properties here, because django can't handle it. This might be a problem.
-
+        constraints = [
+            UniqueConstraint(fields=['_proxied','key_properties','spatial_domain', 'time_domain', 'cell_methods', 'in_file','in_manifest'], 
+                             name='unique_combination_of_fk_fields')
+        ] 
     def __len__(self):
         return len(self._proxied)
 
@@ -500,7 +499,9 @@ class Variable(models.Model):
 
     id = models.AutoField(primary_key=True)
     _proxied = models.JSONField()
-    property_set = models.ForeignKey(VariablePropertySet,on_delete=models.SET_NULL)
+    # we force key_properties to be non null in the save, but doing this allows us
+    # to handle deletion of orphaned key properties sensibly.
+    key_properties = models.ForeignKey(VariablePropertySet,null=True, on_delete=models.SET_NULL)
     spatial_domain = models.ForeignKey(Domain, null=True,on_delete=models.SET_NULL)
     time_domain = models.ForeignKey(TimeDomain, null=True, on_delete=models.SET_NULL)
     cell_methods = models.ForeignKey(Cell_MethodSet, null=True, on_delete=models.SET_NULL)
@@ -536,78 +537,48 @@ class Variable(models.Model):
         """ Return a specific key property by name """
         # Use the mykey method from VariablePropertyKeys to map from prop_name to the enum value
         try:
-            key_code = VariablePropertyKeys.mykey(VariablePropertyKeys, key)
-        except KeyError:
-            raise ValueError(f"'{key}' is not a valid key in VariablePropertyKeys.")
-        
-        # Search for the VariableProperty instance with the matching key
-        try:
-            var_prop = self.key_properties.get(key=key_code)
-            return var_prop.value
-        except VariableProperty.DoesNotExist:
+            key_code = VariablePropertyKeys.mykey(key)
+            return self.key_properties.properties.get(key=key_code).value
+        except (KeyError, VariableProperty.DoesNotExist):
             return None  # Return None if no matching property is found
 
 
     @classmethod    
     def __check_uniqueness(cls, kp, _proxied, spatial_domain, time_domain, cell_methods, in_file, in_manifest):
         """ 
-        Check whether or not the incoming variable description has been seen before. Start by checking
-        that key properties exist and include an identity. Then check all the existing instances with the
-        same properties. Two steps, first the same attributes, then check all the many-to-many relations
-        for duplicates.
+        Check whether or not the incoming variable description has been seen before. 
         """
-
-        # Check uniqueness of other fields first
-        try:
-            
-            keys = [k.key for k in kp]
-            assert 'ID' in keys
-        except:
-            # This is not normal Django behaviour, but the Variable uniqueness isn't normal Django either
-            raise ValueError("One of the key_properties ({key_properties}) must be 'identity'!")
-        
-        # First get all the existing instances
-        existing_instances = Variable.objects.filter(
+        property_set, _ = VariablePropertySet.get_or_create_from_properties(kp)       
+        existing = Variable.objects.filter(
             _proxied=_proxied,
+            key_properties=property_set,
             spatial_domain=spatial_domain,
             time_domain=time_domain,
             cell_methods=cell_methods,
             in_file=in_file,
             in_manifest=in_manifest,
-            )
+            ).first()
         
-        # Now iterate over them all and check combinations
-        for existing_instance in existing_instances:
-
-            # Convert existing key_properties to a set of (key, value) tuples
-            existing_key_properties = set(
-                (prop.key, prop.value) for prop in existing_instance.key_properties.all()
-            )
-
-            # Convert new key_properties (kp) to a set of (key, value) tuples
-            new_key_properties = set(
-                (prop.key, prop.value) for prop in kp  # kp is passed as a list of VariableProperty instances
-            )
-
-            # If key_properties sets are equal, it's a duplicate
-            if existing_key_properties == new_key_properties:
-                return False, existing_instance  # Not unique, return the existing instance
-
-        return True, None  # We are all good.
-    
+        return existing is None, existing
+        
     def save(self, *args, **kwargs):
         """ 
         We have our own specific save method as we need to check uniqueness before attempting to save.
         (calls __check_uniqueness__)
         """
-        
-        kp = kwargs.pop('key_properties',[])
-        args_to_check = [getattr(self,x) for x in ('_proxied', 'spatial_domain', 'time_domain', 'cell_methods', 'in_file', 'in_manifest')]
-        unique, instance = self.__check_uniqueness(kp,*args_to_check)
+        kp = kwargs.pop('key_properties', [])
+        if kp:
+            if isinstance(kp, list):
+                self.key_properties, _ = VariablePropertySet.get_or_create_from_properties(kp)
+            else:
+                self.key_properties = kp
+        if self.get_kp('identity') is None:
+            raise ValueError(f"One of the key_properties ({kp}) must be 'identity'!")
+
+        unique, _ = self.__check_uniqueness(kp, self._proxied, self.spatial_domain, self.time_domain,
+                                    self.cell_methods, self.in_file, self.in_manifest)
         if unique:
-            # Now that checks have passed, we can save the object
-            super().save(*args, **kwargs)  # Save the instance
-            self.key_properties.set(kp)
+            super().save(*args, **kwargs)
         else:
             raise ValueError(f'Cannot save non-unique variable with value {args}')   
 
@@ -615,16 +586,16 @@ class Variable(models.Model):
     def get_or_create_unique_instance(cls, _proxied, key_properties, spatial_domain, time_domain, cell_methods, 
                                       in_file, in_manifest):
         """ 
-        We have our own specific get_or_create_unique_instance method, as we need to do a considerable 
-        amount of work to  check uniqueness. 
+        We have our own specific get_or_create_unique_instance method
         (calls __check_uniqueness__)
         """
-        unique, instance = cls.__check_uniqueness(key_properties, _proxied, spatial_domain, time_domain, cell_methods, 
+        unique, instance =  cls.__check_uniqueness(key_properties, _proxied, spatial_domain, time_domain, cell_methods, 
                                       in_file, in_manifest)
-
         if unique:
+            key_properties_set, _ = VariablePropertySet.get_or_create_from_properties(key_properties)
             new_instance = cls(
                 _proxied=_proxied,
+                key_properties=key_properties_set,
                 spatial_domain=spatial_domain,
                 time_domain=time_domain,
                 cell_methods=cell_methods,
@@ -634,7 +605,7 @@ class Variable(models.Model):
 
             # Save the new instance with the key_properties passed as kwargs
             try:
-                new_instance.save(key_properties=key_properties)
+                new_instance.save()
             except:
                 logger.debug('Crash coming. Details follow')
                 logger.debug(new_instance._vars(with_proxied=False))
@@ -642,27 +613,35 @@ class Variable(models.Model):
                 raise
 
             return new_instance, True  # Return the new instance and a flag indicating creation
-        
+            
         else:
-            return instance, False
-    
+            return  instance, False
+        
     def predelete(self):
         """ 
         When a variable is deleted, we need to make sure that any cell_methods, domains,
-        and terms which are unique to this variable are also deleted. Also delete any
+        and time domains which are unique to this variable are also deleted. Also delete any
         files and manifests if this is the last variable in which they exist.
+        Note that key_properties is dealt with post-delete.
         """
+
+         #Check for orphaned properties etc
+        if self.key_properties.variable_set.count() == 1:
+            # If no other Variable is using this VariablePropertySet, delete it
+            property_set = self.key_properties
+            # Now, check if any VariableProperty in this set is orphaned (unused by any other set)
+            for prop in property_set.properties.all():  # Use .all() to iterate over ManyToManyField
+                if prop.variablepropertyset_set.count() == 1:
+                    # If no other VariablePropertySet uses this VariableProperty, delete it
+                    prop.delete()
+            property_set.delete()
+
+
         for x in ['spatial_domain','cell_methods','time_domain']:
             y = getattr(self,x)
             if y is not None:
-                if y.variable_set.count() == 1:
+                if y.variable_set.count() ==  1:
                     y.delete()
-
-        # Check for orphaned key_properties
-        for key_property in self.key_properties.all():
-        # If no other variable references this key_property, delete it
-            if key_property.variable_set.count() == 1:
-                key_property.delete()
 
         #files and manifests:
         for entity in ['in_manifest','in_file']:
@@ -670,7 +649,12 @@ class Variable(models.Model):
             if instance is not None:
                 if instance.variable_set.count() == 1:
                     instance.delete(islastvar=True)
-
+    
     def delete(self,*args,**kwargs):
         self.predelete()
         super().delete(*args,**kwargs)
+
+
+   
+
+  

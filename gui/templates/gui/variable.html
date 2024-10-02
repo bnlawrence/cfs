@@ -1,8 +1,8 @@
-{% for result in results %}
+{% for variable in results %}
     <div class="result-item">
-        A result {{result.id}}
-        <!-- <h3>{{ result.name }}</h3>
-        <p>ID: {{ result.id }}</p> -->
-        {# Add more fields as necessary #}
+         <!-- Accessing key properties -->
+            <p>Variable: {{variable.key_properties.ID}} ({{variable.key_properties.AO}})</br>
+            Spatial Domain: {{ variable.spatial_domain }}</br>
+            Time Domain: {{ variable.time_domain }}</p>
     </div>
 {% endfor %}
