@@ -159,8 +159,8 @@ def select_variables(request):
     page_number = request.data.get('page')  # Default to page 1
     print(selections, page_number)
 
-    # they both exist in the same db list ... 
-    properties = set(selections['dd-sname'])|set(selections['dd-lname'])|set(selections['dd-tave'])
+    # they all exit in the same db list ... 
+    properties = set(selections['dd-sname'])|set(selections['dd-lname'])|set(selections['dd-tave'])|set(selections['dd-ens'])
     results = Variable.objects.all()  
     if properties:
         results=results.filter(key_properties__properties__id__in=properties)

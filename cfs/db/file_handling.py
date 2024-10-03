@@ -12,7 +12,7 @@ def cfupload_variables(db, location, fields, fd, collection, extra_collections, 
     : db : a CollectionDB instance
     : location :  a location name
     : fields : a list of CF field constructs 
-    : fd : a file data diciotionary
+    : fd : a file data dictionary
     : collection : a db collection name
     : extra_collections : names of any extra collections in which these files and variables might appear
     : returns : tuple (status message, time taken in seconds)
@@ -37,7 +37,7 @@ def cfupload_variables(db, location, fields, fd, collection, extra_collections, 
     logger.info(f'cfupload_file: {len(descriptions)} uploaded in {t3-t2:.2f}s')
 
 
-def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=False, accessor=None, fixer=None):
+def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent, cfa=False, accessor=None, fixer=None):
     """ 
     Upload the cf information held in a bunch of files described by "normal file dictionaries"
     with a list of extra target collections embedded in each.
@@ -51,7 +51,8 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=F
                 on the capability provided by this class. If None, then only the 
                 path informaiton is used.)
     : fixer : often the fields data may need to be fixed before uploading.
-        If this is necessary, pass a function which can be applied to the list of fields.
+        If this is necessary, pass a function which can be applied to the list of fields and the name of
+        the file the fields were in.
 
     """
     if intent == 'F':
@@ -74,7 +75,7 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent,  cfa=F
         xt2 = time()
         if fixer is not None:
             for f in fields:
-                fixer(f)
+                fixer(f, fd['path'])
         xt3 = time()-xt2
         logger.info(f"Initial CF read of {fd['name']} took {xt2-xt1:.2f}s (fixer={xt3:.2f}s)")
         cfupload_variables(db, location_name, fields, fd, base_collection.name, collections, cfa=cfa)

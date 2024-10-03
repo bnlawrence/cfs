@@ -409,10 +409,11 @@ class VariablePropertyKeys(models.TextChoices):
     ATOMIC = 'AO', "atomic_origin"
     FREQ = 'F', "frequency"
     SOURCE = "S", "source"
-    SOURCE_ID = 'SI', "source id"
-    VARIANT = 'VL', "variant label"
+    SOURCE_ID = 'SI', "source_id"
+    VARIANT = 'VL', "variant_label"
     REALM = "R", "realm"
     EXPERIMENT = 'E', "experiment"
+    RUNID = 'RI', "runid"
 
     @classmethod
     def mykey(cls,myvalue):

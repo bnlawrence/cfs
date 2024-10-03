@@ -20,7 +20,7 @@ def get_tm(field):
 
 def fix_canari_coordinates(field):
     """ 
-    This chnages the actual time coordinate and time bounds
+    This changes the actual time coordinate and time bounds
     data by adding the interval offset to the values which
     are present. It should only be used when the check
     carried out in check_for_canari_metadata_issues 
@@ -41,7 +41,7 @@ def fix_canari_coordinates(field):
             bounds[:,1] = bounds[:,1] + interval_offset - cf.Data(1.0,'d')
             logging.info('Fixed time  bounds for {field}')
 
-def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
+def check_for_canari_metadata_issues(field, filename, extra_properties=[], fix_meta=True, fix_coords=False):
     """ 
     All CANARI FILES were produced without correct frequency metadata.
     This routine can fix all these fields if fix=True.
@@ -91,8 +91,10 @@ def check_for_canari_metadata_issues(field, fix_meta=True, fix_coords=False):
         field.del_property('source_index')
         field.set_property('parent_activity_id', field.get_property('parent_source_id'))
         field.set_property('parent_source_id', field.get_property('source_id'))
+        fbits = filename.split('_')
+        field.set_property('runid',fbits[2])
         logger.info(f'Fixed inherited file attributes for {field.identity()} ({frequency})')
-
+    
     else:
          logger.warning(f'Did not fix inherited file attributes for {field}.')
 

@@ -15,10 +15,12 @@
         <table>
             <tr><td><label for="dd-loc">Storage Location:</label></td>
                 <td><label for="dd-col">In collection:</label></td>
+                <td><label for="dd-ens">Ensemble Member</label></td>
                 <td align="center">Filter by location and collection </td>
             </tr><tr>
                 <td><select id="dd-loc" placeholder="Select an option..." class="dropdown"></select></td>
                 <td><select id="dd-col" placeholder="Select an option..." class="dropdown"></select></td>
+                <td><select id="dd-ens" placeholder="Select an option..." class="dropdown"></select></td>
                 <td align="center"><button id="first-filter">Do Filter</button> </td>
             </tr>
         <table>
@@ -201,7 +203,7 @@
          
         // Function to grab selected values from all dropdowns in order to generate a query
          function getSelectedValues() {
-            const dropdownIds = ['dd-loc','dd-col','dd-tave','dd-sname','dd-lname']
+            const dropdownIds = ['dd-loc','dd-col','dd-tave','dd-sname','dd-lname','dd-ens']
             const selectedValues = {}; // Object to hold selected values for each dropdown
              // Loop through each dropdown ID
             dropdownIds.forEach(dropdownId => {
@@ -266,6 +268,7 @@
             populateDropdown('dd-lname', '/api/vocab-select?vocab=long_name');
             populateDropdown('dd-loc', '/api/entity-select?entity=location');
             populateDropdown('dd-col', '/api/entity-select?entity=collection');
+            populateDropdown('dd-ens', '/api/vocab-select?vocab=variant_label');
         }
 
         // Refresh button to repopulate dropdowns

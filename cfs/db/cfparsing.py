@@ -125,7 +125,7 @@ def parse_fields_todict(fields, lookup_xy=None, cfa=False):
             description['manikey'] = cfahandler.parse_field_to_manifest(v)
         properties = v.properties()
         for k in ['standard_name','long_name','realm','source_id','frequency',
-                  'source','variant_label','experiment']:
+                  'source','variant_label','experiment','runid']:
             description[k] = v.get_property(k,None)
             if description[k] is not None:
                 properties.pop(k)
