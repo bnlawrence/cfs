@@ -159,12 +159,20 @@ def select_variables(request):
     page_number = request.data.get('page')  # Default to page 1
     print(selections, page_number)
 
-    # they all exit in the same db list ... 
-    properties = set(selections['dd-sname'])|set(selections['dd-lname'])|set(selections['dd-tave'])|set(selections['dd-ens'])
-    results = Variable.objects.all()  
-    if properties:
-        results=results.filter(key_properties__properties__id__in=properties)
-    
+    properties_sname = set(selections['dd-sname'])
+    properties_lname = set(selections['dd-lname'])
+    properties_tave = set(selections['dd-tave'])
+    properties_ens = set(selections['dd-ens'])
+    results = Variable.objects.all()
+    if properties_sname:
+        results = results.filter(key_properties__properties__id__in=properties_sname)
+    if properties_lname:
+        results = results.filter(key_properties__properties__id__in=properties_lname)
+    if properties_tave:
+        results = results.filter(key_properties__properties__id__in=properties_tave)
+    if properties_ens:
+        results = results.filter(key_properties__properties__id__in=properties_ens)
+        
 
     print(f'Before ordering and distinction we have {results.count()} variables')
     # We need to order the results, so we're doing it this way:
