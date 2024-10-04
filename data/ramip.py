@@ -28,12 +28,11 @@ def atomic_cmip(model):
                     current_level=current_level[p]
                 if parts[-2] not in current_level:
                     current_level[parts[-2]]=[]
-                current_level[parts[-2]].append(str(path))
+                current_level[parts[-2]].append(f'{path},{path.stat().st_size}')
                 
         return folder_dict
 
     mdir = Path(f'{name}_proc')
-    print(mdir)
     mdir.mkdir(exist_ok=True)
     for experiment in model.glob('*'):
         if not experiment.is_dir():
@@ -48,17 +47,17 @@ def atomic_cmip(model):
                 for table in folder_dict:
                     filelist=[]
                     for field in folder_dict[table]:
-                        versions = sorted(folder_dict[table][field]['gn'].keys())
+                        grid = list(folder_dict[table][field].keys())[0]
+                        versions = sorted(folder_dict[table][field][grid].keys())
                         if 'latest' in versions:
                             choice='latest'
                         else:
                             choice = versions[-1]
-                        filelist+=folder_dict[table][field]['gn'][choice]
+                        filelist+=folder_dict[table][field][grid][choice]
                         print(f'Added {field} to {table}')
                     outfile = f'{name}_{member.stem}_{table}_input_files.txt'
                     with open(mdir/outfile,'w') as f:
                         f.write('\n'.join(filelist))
-
 if __name__=="__main__":
     import sys
     print(sys.argv)
