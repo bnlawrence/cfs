@@ -2,4 +2,4 @@ __pycache__/
 *.egg-info
 *.py[cod]
 .vscode
-core.db.migrations/
+cfs.migrations/
