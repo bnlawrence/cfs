@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view
 
 from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
                         Location, Collection)
-from cfs.db.interface import VariableProperyInterface
+from cfs.db.interface import VariableProperyInterface, VariableInterface
 from gui.serializers import VariableSerializer
 
 # Create your views here.
@@ -163,16 +163,9 @@ def select_variables(request):
     properties_lname = set(selections['dd-lname'])
     properties_tave = set(selections['dd-tave'])
     properties_ens = set(selections['dd-ens'])
-    results = Variable.objects.all()
-    if properties_sname:
-        results = results.filter(key_properties__properties__id__in=properties_sname)
-    if properties_lname:
-        results = results.filter(key_properties__properties__id__in=properties_lname)
-    if properties_tave:
-        results = results.filter(key_properties__properties__id__in=properties_tave)
-    if properties_ens:
-        results = results.filter(key_properties__properties__id__in=properties_ens)
-        
+    results = VariableInterface.filter_by_property_keys(
+        [properties_sname, properties_lname, properties_tave, properties_ens]
+        )
 
     print(f'Before ordering and distinction we have {results.count()} variables')
     # We need to order the results, so we're doing it this way:

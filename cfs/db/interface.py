@@ -663,6 +663,21 @@ class VariableInterface(GenericHandler):
         c.variables.add(variable)
         c.save()
 
+    @classmethod
+    def filter_by_property_keys(cls, list_of_keysets):
+        """ 
+        Return a queryset of variables which have been
+        filtered by the key properties which lie in
+        the list of keysets. Each keyset will be 
+        a list of property ids.
+        """
+        results = Variable.objects.all()
+        for value in list_of_keysets:
+            if value:
+                results = results.filter(key_properties__properties__id__in=value)
+        return results
+        
+
     def retrieve_by_keyvalue(self, key, value):
         """Retrieve single variable by arbitrary property"""
         return self.retrieve({key:value})
