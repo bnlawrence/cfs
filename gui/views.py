@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Count
+from django.db.models import Count, Q
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -176,11 +176,18 @@ def select_variables(request):
         n = results.count()
         sdata = results.aggregate(
             nspatial=Count('spatial_domain', distinct=True),
-            ntime=Count('time_domain', distinct=True)
+            ntime=Count('time_domain', distinct=True),
             )
+        # putting this in the aggregate didn't quite work.
+        nvariants = results.filter(
+                key_properties__properties__key='VL'
+            ).values('key_properties__properties__value').distinct().count()
+
         summary = f'<p>Total Results {n}. Includes <ul>'
         summary += f"<li>{sdata['nspatial']} unique spatial domains, and </li>"
-        summary += f"<li>{sdata['ntime']} unique time domain(s).</li></ul>"
+        summary += f"<li>{sdata['ntime']} unique time domain(s),</li>"
+        summary += f"<li>from {nvariants} ensemble member(s).</li>"
+        summary+="</ul>"
         #not enough work for a template
     else:
         summary=''

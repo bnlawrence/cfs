@@ -46,7 +46,7 @@ class VariableSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         
         # Select properties to go to display
-        properties_to_include = ['ID','AO']
+        properties_to_include = ['ID','AO','VL']
         
         # Assuming key_properties is a dict-like structure
         properties = representation['key_properties']['properties']

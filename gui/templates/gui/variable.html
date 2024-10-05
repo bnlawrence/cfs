@@ -1,7 +1,7 @@
 {% for variable in results %}
     <div class="result-item">
          <!-- Accessing key properties -->
-            <p>Variable: {{variable.key_properties.ID}} ({{variable.key_properties.AO}})</br>
+            <p>Variable: {{variable.key_properties.ID}} ({{variable.key_properties.AO}}, {{variable.key_properties.VL}})</br>
             Spatial Domain: {{ variable.spatial_domain }}</br>
             Time Domain: {{ variable.time_domain }}</p>
     </div>
