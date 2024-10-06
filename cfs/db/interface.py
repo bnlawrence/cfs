@@ -144,14 +144,25 @@ class CollectionInterface(GenericHandler):
             else:
                 kwargs['_proxied'][k]=[v]
        
-        return super().create(**kwargs)
+        result = super().create(**kwargs)
+        result.save()
+        return result
 
     
-    def add_variable(self, variable):
+    def add_variable(self, collection, variable):
         """
         Add a variable to the existing collection.
         """
-        self.model.variables.add(variable)
+        collection.variables.add(variable)
+
+    def add_variables(self, collection, variable_set):
+        """
+        Add a queryset of variables to the existing collection
+        in one transaction.
+        """
+        with transaction.atomic():
+            collection.variables.add(*variable_set)
+
 
     def delete(self, collection, force=False):
         """
