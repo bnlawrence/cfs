@@ -9,7 +9,9 @@ from rest_framework.decorators import api_view
 
 from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
                         Location, Collection)
-from cfs.db.interface import VariableProperyInterface, VariableInterface
+from cfs.db.interface import (VariableProperyInterface, VariableInterface,
+                              CollectionInterface)
+
 from gui.serializers import VariableSerializer
 
 # Create your views here.
@@ -155,17 +157,8 @@ def entity_select(request):
 
 @api_view(['POST'])
 def select_variables(request):
-    selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
     page_number = request.data.get('page')  # Default to page 1
-    print(selections, page_number)
-
-    properties_sname = set(selections['dd-sname'])
-    properties_lname = set(selections['dd-lname'])
-    properties_tave = set(selections['dd-tave'])
-    properties_ens = set(selections['dd-ens'])
-    results = VariableInterface.filter_by_property_keys(
-        [properties_sname, properties_lname, properties_tave, properties_ens]
-        )
+    results = _filterview(request)
 
     print(f'Before ordering and distinction we have {results.count()} variables')
     # We need to order the results, so we're doing it this way:
@@ -224,6 +217,52 @@ def select_variables(request):
         myresponse['summary'] = summary
 
     return JsonResponse(myresponse)
+
+
+def _filterview(request):
+    """ Common filtering operations"""
+    selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
+    print(selections)
+    properties_sname = set(selections['dd-sname'])
+    properties_lname = set(selections['dd-lname'])
+    properties_tave = set(selections['dd-tave'])
+    properties_ens = set(selections['dd-ens'])
+    collections = set(selections['dd-col'])
+    results = VariableInterface.filter_by_property_keys(
+        [properties_sname, properties_lname, properties_tave, properties_ens]
+        )
+    if collections:
+        results = results.filter(contained_in__in=collections)
+    return results
+    
+
+
+
+
+
+@api_view(['POST'])
+def add_to_collection(request):
+    selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
+    collection_name = request.data.get('collection_name')
+    print('A2S', selections, collection_name)
+    results = _filterview(request)
+    interface = CollectionInterface()
+
+    try:
+        collection = interface.retrieve_by_name(collection_name)
+        created=False
+    except ValueError:
+        collection = interface.create(collection_name)
+        created=True
+    interface.add_variables(collection, results)
+    count = results.count()
+    if created:
+        msg = f'{count} variables added to new collection {collection_name}.'
+    else:
+        msg = f'{count} variables added to collection {collection_name} (which now has {collection.variables.count()} variables).'
+    return JsonResponse({"message":msg})
+
+
 
 
   

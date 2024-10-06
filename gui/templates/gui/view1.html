@@ -62,20 +62,22 @@
             <div id="action-area" class="rightblock">
                 <div class="block-container">
                     <h4>Add to Collection</h4>
-                    <form id="anotherForm">
+                    <form id="addCollectionForm">
+                        {% csrf_token %}
                         <div class="form-group">
-                            <label for="inputText">Collection Name:</label>
-                            <input type="text" id="inputText1" required>
+                            <label for="inputTextC">Collection Name:</label>
+                            <input type="text" id="inputTextC" required>
                         </div>
                         <button type="submit">Add</button>
                     </form>
                 </div>
                 <div class="block-container">
                     <h4>Download Manifest</h4>
-                    <form id="anotherForm">
+                    <form id="downloadManifestForm">
+                        {% csrf_token %}
                         <div class="form-group">
-                            <label for="inputText">Manifest FileName:</label>
-                            <input type="text" id="inputText2" required>
+                            <label for="inputTextM">Manifest FileName:</label>
+                            <input type="text" id="inputTextM" required>
                         </div>
                         <button type="submit">Download</button>
                     </form>
@@ -94,7 +96,9 @@
     <script>
         // Function to fetch data from an API and populate dropdowns
         const tomSelectInstances = {}; // Object to store Tom Select instances
-        
+        // Used for message handling after form submission
+        const responseDiv = document.getElementById("message-block");
+
         // variables for pagination
         let currentPage = 1;
         let totalResults = 0;
@@ -200,7 +204,30 @@
                 console.error('Error sending selected values:', error);
             }
         }
-         
+
+        // handle the forms
+        async function handleFormSubmit(event, url, formData) {
+            event.preventDefault(); // Prevent default form submission
+            const selectedValues = getSelectedValues(); 
+            formData['selections'] = selectedValues;
+            console.log(JSON.stringify(formData, null, 2));
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),  // Ensure CSRF protection
+                    },
+                    body: JSON.stringify(formData)
+                });
+    
+                const data = await response.json();  // Parse the JSON response
+                responseDiv.innerHTML = `<p>${data.message}</p>`;
+            } catch (error) {
+                responseDiv.innerHTML = `<p>Error: ${error.message}</p>`;
+            }
+        }
+
         // Function to grab selected values from all dropdowns in order to generate a query
          function getSelectedValues() {
             const dropdownIds = ['dd-loc','dd-col','dd-tave','dd-sname','dd-lname','dd-ens']
@@ -228,7 +255,7 @@
         }
 
         // Add event listener for Do Filter button
-        document.getElementById('first-filter').addEventListener('click', filterDropdowns);    
+        document.getElementById('first-filter').addEventListener('click', filterDropdowns);  
 
         // Add event listeners for Select All buttons
         document.querySelectorAll('.select-all').forEach(button => {
@@ -274,12 +301,25 @@
         // Refresh button to repopulate dropdowns
         //document.getElementById('refreshBtn').addEventListener('click', loadDropdowns);
 
+        // Call loadDropdowns on page initialization
+        document.addEventListener('DOMContentLoaded', loadDropdowns);
+
         // Add event listener for sending selected values
         document.getElementById('sendSelectionsBtn').addEventListener('click', sendSelectedValues);
 
-
-        // Call loadDropdowns on page initialization
-        document.addEventListener('DOMContentLoaded', loadDropdowns);
+        // Add event listeners for the forms
+        const addCollectionForm = document.getElementById("addCollectionForm");
+        addCollectionForm.addEventListener("submit", function(event) {
+                const collectionName = document.getElementById("inputTextC").value;
+                handleFormSubmit(event, '/api/add-to-collection/', {collection_name: collectionName});
+                // We might have changed the collection list
+                populateDropdown('dd-col', '/api/entity-select?entity=collection');
+            });
+        const downloadManifestForm = document.getElementById("downloadManifestForm");
+        downloadManifestForm.addEventListener("submit", function(event) {
+            const manifestFilename = document.getElementById("inputTextM").value;
+            handleFormSubmit(event, '/api/download-manifest/', { manifest_filename: manifestFilename });
+        });
 
         // Function to display results in the container
         function displayResults(html) {
@@ -301,7 +341,6 @@
             currentPage--;         
             document.getElementById('sendSelectionsBtn').click(); // Trigger result fetch for new page
             })
-
 
         document.getElementById('next-page').addEventListener('click', function() {
             currentPage++;

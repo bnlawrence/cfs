@@ -25,6 +25,7 @@ urlpatterns = [
     path('api/vocab-select/', views.vocab_select, name='vocab_select'),
     path('api/entity-select/', views.entity_select, name='entity_select'),
     path('api/get-variables-from-selection/',views.select_variables, name='select_variables'),
+    path('api/add-to-collection/',views.add_to_collection, name ='add_to_collection'),
 
     # route for fetching available keys for variable property queries
     path('api/variable-property-keys/', views.get_available_keys, name='get_available_keys'),
