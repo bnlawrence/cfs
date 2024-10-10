@@ -153,6 +153,7 @@ def entity_select(request):
     entity = request.query_params.get('entity')  # Do not accept multiple values
     target = {'collection':Collection, 'location':Location}[entity]
     data = [{'id':v.id, 'name':v.name} for v in target.objects.all()]
+    print(data)
     return Response(data)
 
 @api_view(['POST'])
@@ -234,10 +235,6 @@ def _filterview(request):
     if collections:
         results = results.filter(contained_in__in=collections)
     return results
-    
-
-
-
 
 
 @api_view(['POST'])

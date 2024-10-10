@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tom Select Example</title>
+    <title>Data Selection</title>
     {% load static %} 
     <link href="{% static 'gui/css/styles.css' %}" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/css/tom-select.css" rel="stylesheet">
@@ -111,16 +111,29 @@
 
                 // Assuming the response is a list or an array of options
                 const options = data.results || data;  // Adjust based on API structure
+                console.log('Options fetched from API:', options);
+                
                 if (!Array.isArray(options)) {
                     throw new Error('Expected an array, got something else');
                 }
 
                 // Initialize or update Tom Select with new options
                 const selectElement = document.getElementById(dropdownId);
+                if (!selectElement) {
+                    console.error(`Dropdown with ID ${dropdownId} not found in the DOM.`);
+                    return;
+                }
+                
                 const selectedValues = Array.from(selectElement.selectedOptions).map(option => option.value); // Save current selections
 
                 // Clear existing options
                 selectElement.innerHTML = '';
+               
+                if (tomSelectInstances[dropdownId]) {
+                    tomSelectInstance =  tomSelectInstances[dropdownId];
+                    tomSelectInstance.destroy();  // Destroy the old instance if it exists
+                    // We need to add the new options AFTER this step.
+                }
 
                 // Add new options from the API response
                 options.forEach(item => {
@@ -128,30 +141,19 @@
                     option.value = item.id;
                     option.text = item.name;
                     selectElement.appendChild(option);
+                    console.log(`Item ${item.name}`);
+                });
+                
+                tomSelectInstances[dropdownId] = new TomSelect(selectElement, {
+                    valueField: 'id',
+                    labelField: 'name',
+                    searchField: 'name',
+                    plugins: ['remove_button'],
+                    maxItems: null
                 });
 
-                // Initialize or update Tom Select instance only after populating the options
-                if (tomSelectInstances[dropdownId]) {
-                    // If the instance already exists, just update its options
-                    const tomSelectInstance = tomSelectInstances[dropdownId];
-                    tomSelectInstance.clear();  // Clear current selection
-                    tomSelectInstance.addOptions(options.map(item => ({
-                        value: item.id,
-                        text: item.name
-                    }))); // Add new options
-                    tomSelectInstance.setValue(selectedValues);  // Restore previous selection
-                } else {
-                    // Create a new Tom Select instance if it doesn't exist
-                    tomSelectInstances[dropdownId] = new TomSelect(selectElement, {
-                        valueField: 'id', 
-                        labelField: 'name',
-                        searchField: 'name',
-                        plugins: ['remove_button'],  // Plugin for removing selected options
-                        maxItems: null  // Allow unlimited selections (for multiple select)
-                });
-                tomSelectInstances[dropdownId].setValue(selectedValues);  // Restore previous selection
-            }
-               
+                tomSelectInstances[dropdownId].setValue(selectedValues);  // Restore previous selection 
+
             } catch (error) {
                 console.error(`Failed to fetch data for ${dropdownId}:`, error);
             }
@@ -309,11 +311,12 @@
 
         // Add event listeners for the forms
         const addCollectionForm = document.getElementById("addCollectionForm");
-        addCollectionForm.addEventListener("submit", function(event) {
+        addCollectionForm.addEventListener("submit", async function(event) {
                 const collectionName = document.getElementById("inputTextC").value;
-                handleFormSubmit(event, '/api/add-to-collection/', {collection_name: collectionName});
+                await handleFormSubmit(event, '/api/add-to-collection/', {collection_name: collectionName});
                 // We might have changed the collection list
-                populateDropdown('dd-col', '/api/entity-select?entity=collection');
+                console.log('MADE IT')
+                await populateDropdown('dd-col', '/api/entity-select?entity=collection');
             });
         const downloadManifestForm = document.getElementById("downloadManifestForm");
         downloadManifestForm.addEventListener("submit", function(event) {
