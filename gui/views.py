@@ -3,6 +3,7 @@ from django.http import HttpResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Count, Q
+from django.core.exceptions import ObjectDoesNotExist
 
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
@@ -28,6 +29,10 @@ def oldview(request):
 
 def view1(request):
     return render(request,'gui/view1.html')
+
+def collections(request):
+    collections=CollectionInterface.retrieve()
+    return render(request,'gui/collections.html',context={'collections':collections})
 
 ###
 ### API Rest queries follow
@@ -260,8 +265,23 @@ def add_to_collection(request):
     return JsonResponse({"message":msg})
 
 
+@api_view(['POST'])
+def update_collection_description(request):
+    id = request.data.get('id')
+    description=request.data.get('text')
 
+    collection = CollectionInterface.update_description(id, description)
+    return JsonResponse({'msg':'Updated {{collection}}'})
 
+@api_view(['DELETE'])
+def delete_collection(request, id):
+    try:
+        CollectionInterface.delete_id(id)
+        return JsonResponse({'success': True, 'msg': 'Collection deleted successfully.'})
+    except ObjectDoesNotExist:
+        return JsonResponse({'success': False, 'msg': 'Collection does not exist'})
+    except Exception as e:
+         return JsonResponse({'success': False, 'msg': str(e)})
   
 
 

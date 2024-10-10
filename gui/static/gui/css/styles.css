@@ -49,3 +49,32 @@ td {
 button:hover {
     background-color: #0056b3;
 }*/
+
+table.description-table {
+    width: 100%; /* Make sure the table takes full width */
+    table-layout: fixed; /* Ensures that the table respects the width of columns */
+}
+
+/* Style for the second column */
+td.description-column {
+    width: 40%; /* Set the width to 40% of the screen */
+    word-wrap: break-word; /* Allow text to wrap within the cell */
+    overflow-wrap: break-word; /* Similar to word-wrap, for better browser compatibility */
+    white-space: normal; /* Ensure white space is handled normally */
+}
+
+.editable-container {
+    display: flex;             /* Use flexbox to align items */
+    justify-content: space-between; /* Spread the description and button */
+    align-items: center;       /* Vertically center the content */
+}
+
+.editable {
+    flex-grow: 1;              /* The text area takes up the remaining space */
+    margin-right: 10px;        /* Add some space between the text and the button */
+}
+
+.editButton {
+    /* Optional: Adjust the button appearance */
+    padding: 5px 10px;
+}

@@ -1,0 +1,92 @@
+<div id="collection-table">
+    <table class="description-table">
+    {% for collection in collections %}
+        <tr><td>{{collection.name}}</td>
+            <td class="description-column"> 
+                <div class="editable-container">
+                <div class="editable" data-id="{{collection.id}}">{{collection.description}}</div>
+                <button class="editButton">Edit</button> </td> </div>
+            <td><div class="more-container">more<div class="tooltip-content">{{collection.dump}}</td>
+                <td>View</td><td><button class="deleteButton" id="{{collection.id}}">Delete</button></td>
+        </tr>
+    {% endfor %}
+    </table>
+</div>
+
+<script>
+    const container = document.getElementById('collection-table');
+
+    container.addEventListener('click', function(event) {
+        if (event.target.classList.contains('editButton')) {
+            const editableDiv = event.target.previousElementSibling; // Get the corresponding editable div
+            if (editableDiv.contentEditable === "true") {
+                editableDiv.contentEditable = "false";
+                event.target.textContent = 'Edit';  
+                // Now send changes to backend
+                const id = editableDiv.getAttribute('data-id');
+                const newText = editableDiv.textContent;
+                saveChanges(id, newText);
+            } else {
+                editableDiv.contentEditable = "true";
+                event.target.textContent = 'Save';  // Change button text to "Save"
+            }
+        }
+
+        // Handle Delete functionality
+        if (event.target.classList.contains('deleteButton')) {
+            const button = event.target.closest('button'); // Find the corresponding row
+            const id = button.getAttribute('id'); // Get the collection ID from the row
+            const row = event.target.closest('tr');
+            if (confirm('Are you sure you want to delete this item?')) { // Optional: Confirm deletion
+                deleteRow(row, id); // Delete the row and send the request to the backend
+            }
+        }
+    });
+
+    // Function to send data to the backend
+    function saveChanges(id, newText) {
+        console.log('logging',id,newText)
+        fetch(`/api/update-collection-description/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCSRFToken(),  // Assuming you need to send CSRF token in Django
+            },
+            body: JSON.stringify({ text: newText, id:id })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Successfully saved:', data);
+        })
+        .catch(error => {
+            console.error('Error saving data:', error);
+        });
+    }
+
+    // Function to handle row deletion
+    function deleteRow(row, id) {
+        fetch(`/api/delete-collection/${id}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCSRFToken(), 
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                row.remove(); // Remove the row from the DOM
+            } else {
+                console.error('Failed to delete row');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting row:', error);
+        });
+    }
+
+    // Function to get the CSRF token (Django-specific)// Function to get the CSRF token (Django-specific)
+    function getCSRFToken() {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        return csrfToken;
+    }
+
+</script>

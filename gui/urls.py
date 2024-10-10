@@ -7,6 +7,7 @@ urlpatterns = [
     path("", views.index, name="index"),
 
     #main search
+    path('collections',views.collections,name='collections'),
     path("view",views.view,name="view"),
     path("view1",views.view1,name="view1"),
 
@@ -26,6 +27,8 @@ urlpatterns = [
     path('api/entity-select/', views.entity_select, name='entity_select'),
     path('api/get-variables-from-selection/',views.select_variables, name='select_variables'),
     path('api/add-to-collection/',views.add_to_collection, name ='add_to_collection'),
+    path('api/update-collection-description/',views.update_collection_description, name ='update_collection_description'),
+    path('api/delete-collection/<int:id>/',views.delete_collection, name='delete_collection'),
 
     # route for fetching available keys for variable property queries
     path('api/variable-property-keys/', views.get_available_keys, name='get_available_keys'),

@@ -141,7 +141,6 @@ class Collection(models.Model):
         if self.unique_variables().count() > 0:
             raise PermissionError(f'Cannot delete collection {self} with unique variables')
         super().delete(*args,**kwargs)
-    
 
 class Domain(models.Model):
     """ 

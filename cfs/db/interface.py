@@ -163,18 +163,23 @@ class CollectionInterface(GenericHandler):
         with transaction.atomic():
             collection.variables.add(*variable_set)
 
-
-    def delete(self, collection, force=False):
+    @staticmethod
+    def delete(collection, force=False):
         """
         Delete any related variables.
         """
         if isinstance(collection, str):
-            collection = self.retrieve_by_name(collection)
+            collection = CollectionInterface.retrieve_by_name(collection)
         collection.do_empty(force)
         collection.delete()
 
-    
-    def retrieve(self, name_contains=None, description_contains=None, 
+    @classmethod
+    def delete_id(cls,id, force=False):
+        collection = Collection.objects.get(id=id)
+        cls.delete(collection, force)
+
+    @classmethod
+    def retrieve(cls, name_contains=None, description_contains=None, 
                  contains=None, tagname=None, facet=None):
         """
         Retrieve collections based on various filters.
@@ -182,23 +187,25 @@ class CollectionInterface(GenericHandler):
         if [name_contains, description_contains, contains, tagname, facet].count(None) <= 3:
             raise ValueError("Cannot search on more than one of name, description, tag, facet")
         #FIXME much of this is redundant
+
+        results = Collection.objects
         
         if name_contains:
-            return Collection.objects.filter(name__contains=name_contains)
+            results=results.filter(name__contains=name_contains)
         if description_contains:
-            return Collection.objects.filter(description__contains=description_contains)
+            results=results.filter(description__contains=description_contains)
         if contains:
-            return Collection.objects.filter(
+            results = results.filter(
                 Q(name__contains=contains) | Q(description__contains=contains)
             )
         if tagname:
-            return Collection.objects.filter(tags__name=tagname)
+            results = results.filter(tags__name=tagname)
         if facet:
             key, value = facet
             query = {f'_proxied__{key}': value}
-            return Collection.objects.filter(**query)
+            results=results.filter(**query)
 
-        return Collection.objects.all()
+        return results.all()
     
         
     def delete_subdirs(self, collection, self_destruct=False):
@@ -313,6 +320,14 @@ class CollectionInterface(GenericHandler):
             return Collection.objects.filter(**query).all()
         else:
             return Collection.objects.all()
+        
+    @classmethod
+    def update_description(cls, id, description):
+        c = Collection.objects.get(id=id)
+        c.description = description
+        c.save()
+        return c
+
         
 
 class DomainInterface(GenericHandler):
