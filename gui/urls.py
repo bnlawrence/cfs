@@ -4,12 +4,13 @@ from . import views
 
 urlpatterns = [
     # landing page
-    path("", views.index, name="index"),
+    path("", views.index, name="home"),
 
     #main search
     path('collections',views.collections,name='collections'),
     path("view",views.view,name="view"),
-    path("view1",views.view1,name="view1"),
+    path("view1",views.view1,name="selection"),
+    path('projects',views.projects,name="projects"),
 
     #main search
     path("oldview",views.oldview,name="oldview"),

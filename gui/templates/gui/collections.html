@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="csrf-token" content="{{ csrf_token }}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Collection View</title>
-    {% load static %} 
-    <link href="{% static 'gui/css/styles.css' %}" rel="stylesheet">
-    <!-- <link href="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/css/tom-select.css" rel="stylesheet"> --> 
-</head>
-<body>
-    <h1>CANARI Data Selection</h1>
+{% extends 'gui/base.html' %}
+
+{% block banner %}
+    <h1>Collections</h1>
+{% endblock %}
+
+{% block content %}
 
     {% include 'gui/collection_table.html' %}
 
@@ -23,3 +17,5 @@
         <!-- results container populated by javascript call back -->
         <div id="results-container"></div>
     </div>
+
+{% endblock %}

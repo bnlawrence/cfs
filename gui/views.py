@@ -21,6 +21,9 @@ def index(request):
     """ Core index view """
     return HttpResponse('Hello world')
 
+def projects(request):
+    return render(request,'gui/projects.html')
+
 def view(request):
     return render(request, 'gui/view.html')
 
@@ -31,7 +34,7 @@ def view1(request):
     return render(request,'gui/view1.html')
 
 def collections(request):
-    collections=CollectionInterface.retrieve()
+    collections=CollectionInterface.retrieve_all()
     return render(request,'gui/collections.html',context={'collections':collections})
 
 ###

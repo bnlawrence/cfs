@@ -1,3 +1,46 @@
+/* Navigation menu styles */
+.nav-menu {
+    display: flex;
+    justify-content: center;  /* Centers the buttons horizontally */
+    background-color: #333;
+    list-style-type: none;
+    padding: 10px;
+}
+
+/* Menu items */
+.nav-menu li {
+    margin: 0 15px;  /* Space between buttons */
+}
+
+/* Menu Buttons */
+.nav-menu a {
+    display: block;
+    padding: 10px 20px;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+
+/* Active button */
+.nav-menu a.active {
+    background-color: #04AA6D;  /* Highlight color for active button */
+}
+
+/* Banner */
+
+.banner {
+    color: white;
+    background-color: #808080;
+}
+
+.banner h1 {
+    margin: 2px;
+    padding-left: 20px;
+    padding-bottom: 10px;
+}
+
+
 
 .fullwidth {
     font-family: Arial, sans-serif;
