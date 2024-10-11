@@ -58,7 +58,7 @@ class Posix:
         """
         # Require a unique collection name here
         try:
-            c = self.db.collection.retrieve_by_name(collection_name)
+            c = self.db.collection.retrieve(name=collection_name)
             raise ValueError(f'Cannot add {collection_name} - it already exists')
         except:
             c = self.db.collection.create(name=collection_name, description=collection_description)
@@ -113,7 +113,7 @@ class Posix:
             collections = f['collections']
             for sc in collections:
                 try:
-                    cc = self.db.collection.retrieve_by_name(str(sc))
+                    cc = self.db.collection.retrieve(name=str(sc))
                 except ValueError:
                     cc = self.db.collection.create(name=str(sc), description="Subdirectory of collection {c}")
                     pd = str(Path(sc).parent)

@@ -77,7 +77,7 @@ def test_posix_class_basic(django_dependencies, posix_info):
         str(posix_path),
         'posix_test_collection',
         'collection of variables from the test data')
-    c1 = test_db.collection.retrieve_by_name('posix_test_collection')
+    c1 = test_db.collection.retrieve(name='posix_test_collection')
     assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
 
 
@@ -93,10 +93,10 @@ def test_posix_class_nested(django_dependencies, posix_nest):
         'posix_test_collection2',
         'collection of variables from the test data',
         subcollections=True)
-    c1 = test_db.collection.retrieve_by_name('posix_test_collection2')
+    c1 = test_db.collection.retrieve(name='posix_test_collection2')
     assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
     assert len(test_db.relationship.retrieve('posix_test_collection2','parent_of')) == 1
-    c2 = test_db.collection.retrieve_by_name('posix_test_collection2/subset1')
+    c2 = test_db.collection.retrieve(name='posix_test_collection2/subset1')
     print('C2\n',c2.variables.all(),'**')
     assert c1.variables.count() == 3
     assert c2.variables.count() == 2
@@ -112,7 +112,7 @@ def test_deleting_collections(django_dependencies):
     test_db, ignore , ignore = django_dependencies
 
     n_collections = test_db.collection.count()
-    c = test_db.collection.retrieve_by_name('posix_test_collection2')
+    c = test_db.collection.retrieve(name='posix_test_collection2')
     removed = test_db.collection.delete_subdirs(c)
     assert removed == 2
     remaining = test_db.collection.count()
@@ -124,7 +124,7 @@ def test_cleanup(django_dependencies):
     bulk of the database cleanly.
     """
     test_db, ignore , ignore = django_dependencies
-    collections = test_db.collection.retrieve(name_contains='posix')
+    collections = test_db.collection.retrieve_all(name_contains='posix')
     assert collections.count() == 2, f"Failed to find correct number of posix collections (Got {collections.count()} expected 2)"
     # find all the files in those collections and make sure we delete those
     for collection in collections:

@@ -23,6 +23,75 @@ def get_obj_field(obj, key):
     return obj[key]
 #FIXME: When and how is the filter used, it's come from the old db.py, but it's a GOB thing.
 
+class GenericInterface:
+    # This is the replacement for GenericHandler, I will migrate the subclassses
+    # over time as I can.
+    """
+    A reusable mixin that provides create, retrieve, and get_or_create
+    methods for the overall interface to the various model classes. 
+    """
+    model = None
+    @classmethod
+    def all(cls):
+        return cls.model.objects.all()
+    
+    @classmethod
+    def count(cls):
+        return cls.model.objects.count()
+
+    @classmethod
+    def create(cls, **kwargs):
+        """ Create a new instance of the model. """
+        instance = cls.model(**kwargs)
+        try:
+            instance.save()
+        except Exception as e:
+            if str(e).startswith('UNIQUE constraint'):
+                raise ValueError(f'{cls.model.__name__} instance with unique constraint already exists.')
+        return instance
+
+    @classmethod
+    def retrieve(cls, **kwargs):
+        """ Retrieve a single instance. """
+        results = cls.model.objects.filter(**kwargs)
+        if results.count() == 0:
+            raise ValueError(f'No such {cls.model} instance with {kwargs}')
+        elif results.count() > 1:
+            raise ValueError(f'Unable to match a single {cls.model.__name__}.')
+        return results.first()
+    
+    @classmethod
+    def retrieve_all(cls, **kwargs):
+        """
+        Retrieve all existing intnaces based on keywords.
+        """
+        try:
+            return cls.model.objects.filter(**kwargs).all()
+        except cls.model.DoesNotExist:
+            raise ValueError(f'No {cls.model.__name__} instance matching {kwargs}')
+
+
+    @classmethod
+    def get_or_create(cls, **kwargs):
+        """ Get an existing instance or create a new one. """
+        return cls.model.objects.get_or_create(**kwargs)
+
+    @classmethod
+    def delete(cls, instance):
+        """ Delete the given instance. """
+        instance.delete()
+
+    @classmethod
+    def queryset_delete(cls, queryset):
+        """ 
+        Delete a specific set of instances returned from some query against this model.
+        """
+        if queryset.model != cls.model:
+            raise PermissionError(
+                f'Attempt to delete a queryset of{queryset.model} with {cls.model.__name__}.queryset_delete')
+        for thing in queryset:
+            thing.delete()
+
 
 class GenericHandler:
     """
@@ -49,15 +118,6 @@ class GenericHandler:
             if str(e).startswith('UNIQUE constraint'):
                 raise ValueError(f'{self.model.__name__} instance with unique constraint already exists.')
         return instance
-
-    def retrieve_all(self, **kwargs):
-        """
-        Retrieve all existing intnaces based on keywords.
-        """
-        try:
-            return self.model.objects.filter(**kwargs).all()
-        except self.model.DoesNotExist:
-            raise ValueError(f'No {self.model.__name__} instance matching {kwargs}')
     
     def retrieve(self, **kwargs):
         """ 
@@ -91,6 +151,15 @@ class GenericHandler:
                 f'Attempt to delete a queryset of{queryset.model} with {self.model.__name__}.queryset_delete')
         for thing in queryset:
             thing.delete()
+
+    def retrieve_all(self, **kwargs):
+        """
+        Retrieve all existing intnaces based on keywords.
+        """
+        try:
+            return self.model.objects.filter(**kwargs).all()
+        except self.model.DoesNotExist:
+            raise ValueError(f'No {self.model.__name__} instance matching {kwargs}')
 
     
 
@@ -127,35 +196,38 @@ class CellMethodsInterface(GenericHandler):
         """ Retrieve a cell method supplied as a tuple"""
         kw = {k:v for k,v in zip(['axis','method'],list(method))}
         return super().retrieve(**kw)
-
-class CollectionInterface(GenericHandler):
     
-    def __init__(self):
-        super().__init__(Collection)
+    
 
-    def create(self,name, description='(none)', kw={}):
-        """ Convenience Interface """
-        
-        kwargs = {'name':name, 'description':description,'_proxied':kw.pop('_proxied',{})}
+class CollectionInterface(GenericInterface):
+    model = Collection
+
+    def create(self, **kw):
+        """ Convenience Interface to handle proxied keywords """
+
+        proxied = kw.pop('_proxied',{})
         understood = vars(Collection)
+        kwargs = {'_proxied':proxied}
+        if 'description' not in kw:
+            kwargs['description'] = '(none)'
         for k,v in kw.items():
             if k in understood:
                 kwargs[k]=v
             else:
-                kwargs['_proxied'][k]=[v]
-       
+                kwargs['_proxied'][k]=v
         result = super().create(**kwargs)
         result.save()
         return result
 
-    
-    def add_variable(self, collection, variable):
+    @classmethod
+    def add_variable(cls,collection, variable):
         """
         Add a variable to the existing collection.
         """
         collection.variables.add(variable)
 
-    def add_variables(self, collection, variable_set):
+    @classmethod
+    def add_variables(cls,collection, variable_set):
         """
         Add a queryset of variables to the existing collection
         in one transaction.
@@ -163,24 +235,21 @@ class CollectionInterface(GenericHandler):
         with transaction.atomic():
             collection.variables.add(*variable_set)
 
-    @staticmethod
-    def delete(collection, force=False):
+    @classmethod
+    def delete(cls, collection, force=False):
         """
         Delete any related variables.
         """
         if isinstance(collection, str):
-            collection = CollectionInterface.retrieve_by_name(collection)
+            collection = cls.retrieve(name=collection)
+        elif isinstance(collection,int):
+            collection = cls.retrieve(id=collection)
         collection.do_empty(force)
-        collection.delete()
+        super().delete(collection)
 
     @classmethod
-    def delete_id(cls,id, force=False):
-        collection = Collection.objects.get(id=id)
-        cls.delete(collection, force)
-
-    @classmethod
-    def retrieve(cls, name_contains=None, description_contains=None, 
-                 contains=None, tagname=None, facet=None):
+    def retrieve_all(cls, name_contains=None, description_contains=None, 
+                 contains=None, tagname=None, facet=None, **kw):
         """
         Retrieve collections based on various filters.
         """
@@ -205,10 +274,14 @@ class CollectionInterface(GenericHandler):
             query = {f'_proxied__{key}': value}
             results=results.filter(**query)
 
+        if kw:
+            results = results.filter(**kw)
+
+
         return results.all()
     
-        
-    def delete_subdirs(self, collection, self_destruct=False):
+    @classmethod
+    def delete_subdirs(cls, collection, self_destruct=False):
         """ 
         This deletes all the subdirectories of a specific collection,
         that is, all the collections which hold variables which are 
@@ -220,14 +293,15 @@ class CollectionInterface(GenericHandler):
         if child_relationships:
             for relation in child_relationships:
                 child = relation.related_to
-                removed += self.delete_subdirs(child, self_destruct=True)
+                removed += cls.delete_subdirs(child, self_destruct=True)
         if self_destruct:
             collection.delete()
             return removed+1
         else:
             return removed
 
-    def findall_with_variable(self, variable):
+    @staticmethod
+    def findall_with_variable(variable):
         """Find all collections with a given variable"""
         coldict = {}
         for file in variable.in_files.all():
@@ -238,8 +312,8 @@ class CollectionInterface(GenericHandler):
                     coldict[collection] += 1
         return coldict
 
-
-    def add_type(self, collection, key, value):
+    @classmethod
+    def add_type(cls, collection, key, value):
         """ 
         Add a particular collection property to the collection.
         These key,value pairs should only be used when they 
@@ -250,7 +324,7 @@ class CollectionInterface(GenericHandler):
         : value : key to use 
         """
         if not isinstance(collection, Collection):
-            collection=self.retrieve_by_name(collection)
+            collection=cls.retrieve(name=collection)
         if key == '_type':
             try:
                 value = FileType.get_value(value)
@@ -258,68 +332,6 @@ class CollectionInterface(GenericHandler):
                 raise ValueError('The special collection key _type must have value which is a FileType key')
         term, created = CollectionType.objects.get_or_create(key=key,value=value)
         collection.type.add(term)
-
-    def retrieve_by_name(self, collection_name):
-        """
-        Retrieve a particular collection via it's name <collection_name>.
-        """
-        results = self.retrieve(name_contains=collection_name)
-        if len(results) == 0:
-            raise ValueError(f'Collection {collection_name} not found')
-        else:
-            # uniquness enforced by model 
-            return results[0]
-
-    def collections_retrieve(
-        self,
-        name_contains=None,
-        description_contains=None,
-        contains=None,
-        tagname=None,
-        facet=None,
-    ):
-        # retrieve_collections
-        """
-        Return a list of all collections as collection instances,
-        optionally including those which contain:
-
-        - the string <name_contains> somewhere in their name OR
-        - <description_contains> somewhere in their description OR
-        - the string <contains> is either in the name or the description OR
-        - with specific tagname OR
-        - the properties dictionary for the collection contains key with value - facet = (key,value)
-
-        """
-        if [name_contains, description_contains, contains, tagname, facet].count(
-                None
-        ) <= 3:
-            raise ValueError(
-                "Invalid request to <get_collections>, cannot search on more than one of name, description, tag, facet"
-            )
-
-        if name_contains:
-            return Collection.objects.filter(name__contains=name_contains).all()
-        elif description_contains:
-            return Collection.objects.filter(description__contains=description_contains).all()
-        elif contains:
-
-            return Collection.objects.filter(
-                Q(name__contains=contains) | Q(description__contains=contains).all()
-            )
-        elif tagname:
-            return Collection.objects.filter(tags__name=tagname).all()
-            # tag = Tag.objects.get(name=tagname)
-            # return tag.in_collections
-        elif facet:
-            # FIXME: I am not sure what is going on with facets and properties right now.
-            # So  I've gone back to using the proxied rather than properties option.
-            # as of September 2024 to get unit tests going. I expect to be back.
-            key, value = facet
-            # return Collection.objects.filter(properties_key=key, properties_value=value)
-            query = {f'_proxied__{key}': value}
-            return Collection.objects.filter(**query).all()
-        else:
-            return Collection.objects.all()
         
     @classmethod
     def update_description(cls, id, description):
@@ -526,8 +538,8 @@ class RelationshipInterface(GenericHandler):
         : returns : relationship instance
         """
         #def add_relationship(self, collection_one, collection_two, relationship):
-        c1 = self.collection.retrieve_by_name(collection_one)
-        c2 = self.collection.retrieve_by_name(collection_two)
+        c1 = self.collection.retrieve(name=collection_one)
+        c2 = self.collection.retrieve(name=collection_two)
 
         rel = Relationship(subject=c1, predicate=relationship, related_to=c2)
         rel.save()
@@ -560,7 +572,7 @@ class RelationshipInterface(GenericHandler):
         which have <relationship> as the predicate.
         """
         #def retrieve_relationships(self, collection, relationship=None):
-        c = self.collection.retrieve_by_name(collection)
+        c = self.collection.retrieve(name=collection)
         if relationship:
             if outbound:
                 r = c.related_to.objects 
@@ -588,14 +600,14 @@ class TagInterface(GenericHandler):
         Associate a tag with a collection
         """
         tag, s = self.get_or_create(name=tagname)
-        c = self.collection.retrieve_by_name(collection_name)
+        c = self.collection.retrieve(name=collection_name)
         c.tags.add(tag)
 
     def remove_from_collection(self, collection_name, tagname):
         """
         Remove a tag from a collection
         """
-        c = self.collection.retrieve_by_name(collection_name)
+        c = self.collection.retrieve(name=collection_name)
         tag = Tag(name=tagname)
         c.tags.remove(tag)
 
@@ -908,7 +920,7 @@ class CollectionDB:
         """
 
         try:
-            c = self.collection.retrieve_by_name(collection_name)
+            c = self.collection.retrieve(name=collection_name)
             loc = self.location.retrieve(location_name)
         except Collection.DoesNotExist:
             raise ValueError("Collection not yet available in database")

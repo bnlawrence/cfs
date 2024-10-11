@@ -225,6 +225,7 @@
                 });
     
                 const data = await response.json();  // Parse the JSON response
+                console.log(data.message)
                 responseDiv.innerHTML = `<p>${data.message}</p>`;
             } catch (error) {
                 responseDiv.innerHTML = `<p>Error: ${error.message}</p>`;

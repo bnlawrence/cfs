@@ -43,8 +43,8 @@ def test_db():
     return CollectionDB()
    
 def test_collection_create(test_db):
-    kw = {'resolution': 'N512', 'workspace': 'testws'}
-    info = test_db.collection.create('mrun1','(none)', kw)
+    kw = {'name':'mrun1','resolution': 'N512', 'workspace': 'testws'}
+    info = test_db.collection.create(**kw)
     assert info.name == 'mrun1'
     assert info.description == '(none)'
 
@@ -55,14 +55,14 @@ def test_delete_empty_collection(test_db):
 
 def test_unique_collection(test_db):
     kw = {'resolution': 'N512', 'workspace': 'testws'}
-    test_db.collection.create('mrun2', '(none)', kw)
+    test_db.collection.create(name='mrun2', **kw)
     with pytest.raises(ValueError) as context:
-        test_db.collection.create('mrun2', '(none)', kw)
+        test_db.collection.create(name='mrun2',**kw)
     assert 'unique constraint' in str(context)
 
 def test_fileupload(test_db):
     """ Test uploading files """
-    test_db.collection.create('mrun3', '(none)', {})
+    test_db.collection.create(name='mrun3')
     loc=test_db.location.create('testing')
     files = [{'path': '/somewhere/in/unix_land', 'name': f'filet{i}', 'size': 10,'location':loc} for i in range(10)]
     for f in files:
@@ -76,7 +76,7 @@ def test_add_and_retrieve_tag(test_db):
     test_db.tag.create(tagname)
     test_db.tag.add_to_collection('mrun1', tagname)
     test_db.tag.add_to_collection('mrun3', tagname)
-    tagged = test_db.collection.retrieve(tagname=tagname)
+    tagged = test_db.collection.retrieve_all(tagname=tagname)
     assert ['mrun1', 'mrun3'] == [x.name for x in tagged]
 
 def test_get_collections(test_db):
@@ -84,13 +84,13 @@ def test_get_collections(test_db):
     Test ability to get a subset of collections via name and/or description
     """
     for i in range(5):
-        test_db.collection.create(f'dummy{i}','no description', {})
-        test_db.collection.create(f'eg{i}','no description', {})
-    test_db.collection.create('dummy11','actual description',{})
-    assert len(test_db.collection.retrieve(name_contains='g')) == 5
-    assert len(test_db.collection.retrieve(description_contains='actual')) ==  1
+        test_db.collection.create(name=f'dummy{i}')
+        test_db.collection.create(name=f'eg{i}')
+    test_db.collection.create(name='dummy11',description='actual description')
+    assert len(test_db.collection.retrieve_all(name_contains='g')) == 5
+    assert len(test_db.collection.retrieve_all(description_contains='actual')) ==  1
     with pytest.raises(ValueError) as context:
-        test_db.collection.retrieve(description_contains='actual', name_contains='x')
+        test_db.collection.retrieve_all(description_contains='actual', name_contains='x')
     assert 'Cannot search' in str(context)
 
 
@@ -100,10 +100,10 @@ def test_collection_properties(test_db):
     """
     choice = ['dummy2', 'dummy3']
     for c in choice:
-        cc = test_db.collection.retrieve(c)[0]
+        cc = test_db.collection.retrieve(name=c)
         cc['color'] = 'green'
         cc.save()
-    r = test_db.collection.retrieve(facet=('color', 'green'))
+    r = test_db.collection.retrieve_all(facet=('color', 'green'))
     assert choice == [x.name for x in r]
 
 

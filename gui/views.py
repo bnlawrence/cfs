@@ -251,17 +251,20 @@ def add_to_collection(request):
     interface = CollectionInterface()
 
     try:
-        collection = interface.retrieve_by_name(collection_name)
+        collection = interface.retrieve(name=collection_name)
         created=False
     except ValueError:
-        collection = interface.create(collection_name)
+        collection = interface.create(name=collection_name)
         created=True
-    interface.add_variables(collection, results)
-    count = results.count()
-    if created:
-        msg = f'{count} variables added to new collection {collection_name}.'
-    else:
-        msg = f'{count} variables added to collection {collection_name} (which now has {collection.variables.count()} variables).'
+    try:
+        interface.add_variables(collection, results)
+        count = results.count()
+        if created:
+            msg = f'{count} variables added to new collection {collection_name}.'
+        else:
+            msg = f'{count} variables added to collection {collection_name} (which now has {collection.variables.count()} variables).'
+    except Exception as e:
+        msg = str(e)
     return JsonResponse({"message":msg})
 
 

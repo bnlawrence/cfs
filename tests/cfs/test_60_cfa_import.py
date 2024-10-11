@@ -113,7 +113,7 @@ def test_cfa_view(django_dependencies, cfa_resources):
         regex='*.cfa',
         intent='C'
         )
-    c1 = test_db.collection.retrieve_by_name('posix_cfa_example')
+    c1 = test_db.collection.retrieve(name='posix_cfa_example')
     assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
 
 
@@ -159,7 +159,7 @@ def test_variable(django_dependencies):
 def test_deletion(django_dependencies):
 
     test_db, ignore , ignore = django_dependencies
-    collections = test_db.collection.retrieve(name_contains='posix')
+    collections = test_db.collection.retrieve_all(name_contains='posix')
     assert collections.count() == 1, "Failed to find correct number of posix collections"
 
     #first test whether or not a collection delete without forcing does the right thing
@@ -178,7 +178,7 @@ def test_deletion(django_dependencies):
     collection.delete(force=True)
 
     with pytest.raises(ValueError):
-        test_db.collection.retrieve_by_name('posix_cfa_example')
+        test_db.collection.retrieve(name='posix_cfa_example')
 
     n_all_variables = test_db.variable.count()
     assert n_all_variables == 0
