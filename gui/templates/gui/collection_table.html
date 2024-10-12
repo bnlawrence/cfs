@@ -1,14 +1,18 @@
 <div id="collection-table">
     <table class="description-table">
-    {% for collection in collections %}
-        <tr><td>{{collection.name}}</td>
-            <td class="description-column"> 
-                <div class="editable-container">
-                <div class="editable" data-id="{{collection.id}}">{{collection.description}}</div>
-                <button class="editButton">Edit</button> </td> </div>
-            <td><div class="more-container">more<div class="tooltip-content">{{collection.dump}}</td>
-                <td><button class="viewButton" id="view-{{collection.id}}">View</view></td><td><button class="deleteButton" id="{{collection.id}}">Delete</button></td>
-        </tr>
-    {% endfor %}
+    <thead>
+        <tr><th>Collection</th><th class="description-column">Description</th><th>Tags</th><th>Actions</th></tr>
+    </thead><tbody>
+        {% for collection in collections %}
+            <tr><td>{{collection.name}}</td>
+                <td class="description-column"> 
+                    <div class="editable-container">
+                    <div class="editable" data-id="{{collection.id}}">{{collection.description}}</div>
+                    <button class="editButton">Edit</button> </td> </div>
+                <td><div class="more-container">more<div class="tooltip-content">{{collection.dump}}</td>
+                    <td><button class="viewButton" id="view-{{collection.id}}">View</view>&nbsp;<button class="deleteButton" id="{{collection.id}}">Delete</button></td>
+            </tr>
+        {% endfor %}
+        </tbody>
     </table>
 </div>
