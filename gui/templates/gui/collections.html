@@ -5,17 +5,146 @@
 {% endblock %}
 
 {% block content %}
-
+<div class=fullwidth>
     {% include 'gui/collection_table.html' %}
+</div>
+{% endblock %}
 
-    <div id="results" class="results-block" style="display:none;">
-        <div id="pagination-controls" class="pagination-controls">
-            <button id="prev-page" disabled>Previous</button>
-            <span id="page-info"></span>
-            <button id="next-page" disabled>Next</button>
+{% block results_header%}
+<div class="fullwidth">
+           
+    <div id="results-header" class="leftblock">
+        <div class="block-container">
+        <h4> Summary </h4>
+        <div id="summary-content"></div>
         </div>
-        <!-- results container populated by javascript call back -->
-        <div id="results-container"></div>
     </div>
+</div>
 
 {% endblock %}
+
+{% block  page_scripts %}
+<script>
+    const container = document.getElementById('collection-table');
+    let myLastViewButton = 0;
+
+    container.addEventListener('click', function(event) {
+        if (event.target.classList.contains('editButton')) {
+            const editableDiv = event.target.previousElementSibling; // Get the corresponding editable div
+            if (editableDiv.contentEditable === "true") {
+                editableDiv.contentEditable = "false";
+                event.target.textContent = 'Edit';  
+                // Now send changes to backend
+                const id = editableDiv.getAttribute('data-id');
+                const newText = editableDiv.textContent;
+                saveChanges(id, newText);
+            } else {
+                editableDiv.contentEditable = "true";
+                event.target.textContent = 'Save';  // Change button text to "Save"
+            }
+        }
+
+        // Handle Delete functionality
+        if (event.target.classList.contains('deleteButton')) {
+            const button = event.target.closest('button'); // Find the corresponding button
+            const id = button.getAttribute('id'); // Get the collection ID from the button
+            
+            const row = event.target.closest('tr');
+            if (confirm('Are you sure you want to delete this item?')) { // Optional: Confirm deletion
+                deleteRow(row, id); // Delete the row and send the request to the backend
+            }
+        }
+
+        //Handle View functionality
+        if (event.target.classList.contains('viewButton')) {
+            const button = event.target.closest('button'); // Find the button
+            myLastViewButton = button.getAttribute('id'); // Get the button id
+            getCollection(myLastViewButton);
+        }
+    });
+
+    function getButtonId() {
+        return myLastViewButton; 
+    }
+
+    // Function to send data to the backend
+    function saveChanges(id, newText) {
+        console.log('logging',id,newText)
+        fetch(`/api/update-collection-description/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie(),  // Assuming you need to send CSRF token in Django
+            },
+            body: JSON.stringify({ text: newText, id:id })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Successfully saved:', data);
+        })
+        .catch(error => {
+            console.error('Error saving data:', error);
+        });
+    }
+
+    // Function to handle row deletion
+    function deleteRow(row, id) {
+        fetch(`/api/delete-collection/${id}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': getCookie(), 
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                row.remove(); // Remove the row from the DOM
+            } else {
+                console.error('Failed to delete row');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting row:', error);
+        });
+    }
+
+
+    // Function to send selected values to the backend API and get results
+    async function getCollection(id) {
+        
+        try {
+            // Fetch both summary and paginated data (depending on currentPage)
+            console.log('Fetching',id)
+            let idnum = id.split('-').pop();
+            const response = await fetch('/api/get-variables-from-collection/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie()
+                },
+                body: JSON.stringify({ id:idnum, page: currentPage })
+            });
+    
+            if (!response.ok) throw new Error('Network response was not ok');
+            const data = await response.json();
+    
+            // Process paginated data
+            totalResults = data.total;  // Get total results
+            totalPages = data.total_pages;  // Get total pages from backend
+            displayResults(data.html);  // Display the paginated results
+            updatePagination(currentPage, totalPages);  // Update pagination controls
+            // Only update the summary if it's present in the response (i.e., page 1)
+            if (data.summary) {
+                document.getElementById('summary-content').innerHTML = data.summary;
+            }
+            const varHeader = document.getElementById('varHeader')
+            console.log('varHeader', varHeader)
+            varHeader.innerHTML=`<h2>${data.header}</h2>`
+            
+        } catch (error) {
+            console.error('Error sending selected values:', error);
+        }
+    }
+</script>
+{% endblock%}
+
+

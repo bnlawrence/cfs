@@ -40,12 +40,13 @@
     padding-bottom: 10px;
 }
 
-
+/* query area */
 
 .fullwidth {
     font-family: Arial, sans-serif;
     margin: 0px;
     display: flex; /* Use flexbox for horizontal layout */
+    background-color:#F5F5F5;
 }
 
 .leftblock {
@@ -60,16 +61,6 @@
     display: flex; /* Use flexbox for horizontal layout */
 }
 
-table {
-    width: 100%; /* Optional: Set table width to full */
-    border-collapse: collapse; /* Optional: Collapse borders */
-}
-
-td {
-    vertical-align: top; /* Aligns content to the top of the cell */
-    padding: 10px; /* Optional: Add padding for better spacing */
-    border: 1px solid #ddd; /* Optional: Add borders for better visibility */
-}
 
 .block-container {
     margin: 0 10px; /* Space between blocks */
@@ -93,8 +84,28 @@ button:hover {
     background-color: #0056b3;
 }*/
 
+.variables {
+    background-color: #DCDCDC;
+    padding:10px;
+}
+
+table {
+    width: 100%; /* Optional: Set table width to full */
+    border-collapse: collapse; /* Optional: Collapse borders */
+}
+
+td {
+    vertical-align: top; /* Aligns content to the top of the cell */
+    padding: 10px; /* Optional: Add padding for better spacing */
+    border: 1px solid #ddd; /* Optional: Add borders for better visibility */
+}
+
+#collection-table {
+    max-height:400px;
+    overflow-y: scroll;
+}
+
 table.description-table {
-    width: 100%; /* Make sure the table takes full width */
     table-layout: fixed; /* Ensures that the table respects the width of columns */
 }
 

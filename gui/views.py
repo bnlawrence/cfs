@@ -220,7 +220,8 @@ def select_variables(request):
         'html': html,
         'total': paginator.count,  # Total count of results
         'page': page_results.number,  # Current page
-        'total_pages': paginator.num_pages  # Total number of pages
+        'total_pages': paginator.num_pages,  # Total number of pages
+        'header': "Selected Variables"
     }
     if summary:
         myresponse['summary'] = summary
@@ -289,6 +290,72 @@ def delete_collection(request, id):
     except Exception as e:
          return JsonResponse({'success': False, 'msg': str(e)})
   
+
+@api_view(['POST'])
+def get_collection(request):
+    page_number = request.data.get('page')  # Default to page 1
+    id = request.data.get('id')
+    collection = CollectionInterface.retrieve(id=id)
+    results = collection.variables.all()
+
+    print(f'Before ordering and distinction we have {results.count()} variables')
+    # We need to order the results, so we're doing it this way:
+    results = (results
+                .order_by('key_properties', 'id')  # First order by property value, then by id
+                )
+    if page_number == 1:
+        n = results.count()
+        sdata = results.aggregate(
+            nspatial=Count('spatial_domain', distinct=True),
+            ntime=Count('time_domain', distinct=True),
+            )
+        # putting this in the aggregate didn't quite work.
+        nvariants = results.filter(
+                key_properties__properties__key='VL'
+            ).values('key_properties__properties__value').distinct().count()
+
+        summary = f'<p>Total Results {n}. Includes <ul>'
+        summary += f"<li>{sdata['nspatial']} unique spatial domains, and </li>"
+        summary += f"<li>{sdata['ntime']} unique time domain(s),</li>"
+        summary += f"<li>from {nvariants} ensemble member(s).</li>"
+        summary+="</ul>"
+        #not enough work for a template
+    else:
+        summary=''
+        
+    # Paginate results using vanilla django pagination, the DRF one didnt' work
+    paginator = Paginator(results, 10)
+
+    try:
+        page_results = paginator.page(page_number)  # Get the specific page
+    except PageNotAnInteger:
+        # If page_number is not an integer, deliver the first page.
+        page_results = paginator.page(1)
+    except EmptyPage:
+        # If page_number is out of range (e.g. 9999), deliver the last page of results.
+        page_results = paginator.page(paginator.num_pages)
+
+    serializer = VariableSerializer(page_results, many=True)
+
+    html = render_to_string('gui/variable.html', {'results': serializer.data})
+
+    print('page',page_results.number,' of ', paginator.num_pages)
+    #Return the rendered HTML along with pagination info
+    
+    myresponse = {
+        
+        'html': html,
+        'total': paginator.count,  # Total count of results
+        'page': page_results.number,  # Current page
+        'total_pages': paginator.num_pages,  # Total number of pages
+        'header': f'Collection "{collection.name}" Variables'
+    }
+    if summary:
+        myresponse['summary'] = summary
+
+    return JsonResponse(myresponse)
+    
+
 
 
 

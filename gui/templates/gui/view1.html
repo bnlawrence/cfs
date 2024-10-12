@@ -39,11 +39,12 @@
         </table>
     </div>
 
-    <button id="sendSelectionsBtn">Search</button>
+    <button id="viewButton">Search</button>
 
-    <div id="message-block"></div>
-    <div id="results" class="results-block" style="display:none;">
-        <h2> Selection </h2>
+{% endblock %}
+
+{% block results_header %}
+
         <div class="fullwidth">
            
             <div id="results-header" class="leftblock">
@@ -78,13 +79,10 @@
                 </div>
             </div>
         </div> 
-        <div id="pagination-controls" class="pagination-controls">
-            <button id="prev-page" disabled>Previous</button>
-            <span id="page-info"></span>
-            <button id="next-page" disabled>Next</button>
-        </div>
-        <div id="results-container"></div>
-    </div>
+
+{% endblock %}
+
+{% block page_scripts%}
 
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/js/tom-select.complete.min.js"></script>
     <script>
@@ -92,11 +90,6 @@
         const tomSelectInstances = {}; // Object to store Tom Select instances
         // Used for message handling after form submission
         const responseDiv = document.getElementById("message-block");
-
-        // variables for pagination
-        let currentPage = 1;
-        let totalResults = 0;
-        let resultsPerPage = 0;  // Initialize but get it from the backend later
 
         async function populateDropdown(dropdownId, apiUrl) {
             try {
@@ -135,7 +128,6 @@
                     option.value = item.id;
                     option.text = item.name;
                     selectElement.appendChild(option);
-                    console.log(`Item ${item.name}`);
                 });
                 
                 tomSelectInstances[dropdownId] = new TomSelect(selectElement, {
@@ -195,6 +187,9 @@
                 if (data.summary) {
                     document.getElementById('summary-content').innerHTML = data.summary;
                 }
+                const varHeader = document.getElementById('varHeader')
+                console.log('varHeader', varHeader)
+                varHeader.innerHTML=`<h2>${data.header}</h2>`
                 
             } catch (error) {
                 console.error('Error sending selected values:', error);
@@ -302,7 +297,7 @@
         document.addEventListener('DOMContentLoaded', loadDropdowns);
 
         // Add event listener for sending selected values
-        document.getElementById('sendSelectionsBtn').addEventListener('click', sendSelectedValues);
+        document.getElementById('viewButton').addEventListener('click', sendSelectedValues);
 
         // Add event listeners for the forms
         const addCollectionForm = document.getElementById("addCollectionForm");
@@ -319,41 +314,12 @@
             handleFormSubmit(event, '/api/download-manifest/', { manifest_filename: manifestFilename });
         });
 
-        // Function to display results in the container
-        function displayResults(html) {
-            const container = document.getElementById('results');
-            container.style.display="block";
-            const innerContainer = document.getElementById('results-container')
-            innerContainer.innerHTML = html; 
+        function getButtonId() {
+            // used by the pagination, pretty simple for this page!
+            return 'viewButton'; 
         }
-
-        // Function to update pagination controls
-        function updatePagination(currentPage, totalPages) {
-            document.getElementById('prev-page').disabled = currentPage === 1;
-            document.getElementById('next-page').disabled = currentPage === totalPages;
-            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
-        }
-
-        // Event listeners for pagination buttons
-        document.getElementById('prev-page').addEventListener('click', function() {   
-            currentPage--;         
-            document.getElementById('sendSelectionsBtn').click(); // Trigger result fetch for new page
-            })
-
-        document.getElementById('next-page').addEventListener('click', function() {
-            currentPage++;
-            document.getElementById('sendSelectionsBtn').click(); // Trigger result fetch for new page
-        })
-
-
-        // Function to get CSRF token (if using Django)
-        // Function to get the CSRF token (Django-specific)// Function to get the CSRF token (Django-specific)
-        function getCookie() {
-            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-            return csrfToken;
-        }
-
 
     </script>
 
-{% endblock %}
+{% endblock%}
+

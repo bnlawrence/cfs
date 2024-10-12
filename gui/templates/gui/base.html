@@ -24,12 +24,81 @@
     {% block banner %}
     {% endblock %}
      </div>
-    
 
-    <!-- Content Block -->
+     <!-- Main Content Block -->
     <div class="content">
         {% block content %}
         {% endblock %}
     </div>
+    
+    <div id="message-block"></div>
+
+    <!-- Main results area -->
+    <div id="results" class="results-block" style="display:none;">
+        <div class="variables">
+            <div id="varHeader"></div>
+            {% block results_header %}
+            {% endblock %}
+            <div id="pagination-controls" class="pagination-controls">
+                <button id="prev-page" disabled>Previous</button>
+                <span id="page-info"></span>
+                <button id="next-page" disabled>Next</button>
+            </div>
+            <div id="results-container"></div>
+        </div>
+    </div>
+
+    <!-- Common scripts then page specific scripts follow -->
+
+     <script>
+        // Function to get CSRF token
+            function getCookie() {
+                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+                return csrfToken;
+            }
+            // variables for pagination
+            let currentPage = 1;
+            let totalResults = 0;
+            let resultsPerPage = 0;  // Initialize but get it from the backend later
+    
+            /* Display Variable Results */ 
+        
+            // Function to display results in the container
+            function displayResults(html) {
+                const container = document.getElementById('results');
+                container.style.display="block";
+                const innerContainer = document.getElementById('results-container')
+                innerContainer.innerHTML = html; 
+            }
+        
+            // Function to update pagination controls
+            function updatePagination(currentPage, totalPages) {
+                document.getElementById('prev-page').disabled = currentPage === 1;
+                document.getElementById('next-page').disabled = currentPage === totalPages;
+                document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+            }
+        
+            // Event listeners for pagination buttons
+            
+            function handlePagination(buttonId, increment) {
+                currentPage += increment;  // Increment or decrement the page number
+                document.getElementById(buttonId).click();  // Trigger the button click
+            }
+    
+            document.getElementById('prev-page').addEventListener('click', function() {   
+                const buttonId = getButtonId();       
+                handlePagination(buttonId, -1); // Trigger result fetch for new page
+                })
+        
+            document.getElementById('next-page').addEventListener('click', function() {
+                const buttonId = getButtonId();       
+                handlePagination(buttonId, 1); 
+            })
+        
+        </script>
+    
+    {% block page_scripts %}
+    {% endblock %}
+
 </body>
 </html>
