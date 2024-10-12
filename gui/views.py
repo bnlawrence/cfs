@@ -19,7 +19,7 @@ from gui.serializers import VariableSerializer
 
 def index(request):
     """ Core index view """
-    return HttpResponse('Hello world')
+    return render(request,'gui/home.html')
 
 def projects(request):
     return render(request,'gui/projects.html')
