@@ -50,52 +50,55 @@
 
     <!-- Common scripts then page specific scripts follow -->
 
-     <script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/js/tom-select.complete.min.js"></script>
+    <script>
+        
+
         // Function to get CSRF token
-            function getCookie() {
-                const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-                return csrfToken;
-            }
-            // variables for pagination
-            let currentPage = 1;
-            let totalResults = 0;
-            let resultsPerPage = 0;  // Initialize but get it from the backend later
+        function getCookie() {
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            return csrfToken;
+        }
+        // variables for pagination
+        let currentPage = 1;
+        let totalResults = 0;
+        let resultsPerPage = 0;  // Initialize but get it from the backend later
+
+        /* Display Variable Results */ 
     
-            /* Display Variable Results */ 
-        
-            // Function to display results in the container
-            function displayResults(html) {
-                const container = document.getElementById('results');
-                container.style.display="block";
-                const innerContainer = document.getElementById('results-container')
-                innerContainer.innerHTML = html; 
-            }
-        
-            // Function to update pagination controls
-            function updatePagination(currentPage, totalPages) {
-                document.getElementById('prev-page').disabled = currentPage === 1;
-                document.getElementById('next-page').disabled = currentPage === totalPages;
-                document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
-            }
-        
-            // Event listeners for pagination buttons
-            
-            function handlePagination(buttonId, increment) {
-                currentPage += increment;  // Increment or decrement the page number
-                document.getElementById(buttonId).click();  // Trigger the button click
-            }
+        // Function to display results in the container
+        function displayResults(html) {
+            const container = document.getElementById('results');
+            container.style.display="block";
+            const innerContainer = document.getElementById('results-container')
+            innerContainer.innerHTML = html; 
+        }
     
-            document.getElementById('prev-page').addEventListener('click', function() {   
-                const buttonId = getButtonId();       
-                handlePagination(buttonId, -1); // Trigger result fetch for new page
-                })
+        // Function to update pagination controls
+        function updatePagination(currentPage, totalPages) {
+            document.getElementById('prev-page').disabled = currentPage === 1;
+            document.getElementById('next-page').disabled = currentPage === totalPages;
+            document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+        }
+    
+        // Event listeners for pagination buttons
         
-            document.getElementById('next-page').addEventListener('click', function() {
-                const buttonId = getButtonId();       
-                handlePagination(buttonId, 1); 
+        function handlePagination(buttonId, increment) {
+            currentPage += increment;  // Increment or decrement the page number
+            document.getElementById(buttonId).click();  // Trigger the button click
+        }
+
+        document.getElementById('prev-page').addEventListener('click', function() {   
+            const buttonId = getButtonId();       
+            handlePagination(buttonId, -1); // Trigger result fetch for new page
             })
-        
-        </script>
+    
+        document.getElementById('next-page').addEventListener('click', function() {
+            const buttonId = getButtonId();       
+            handlePagination(buttonId, 1); 
+        })
+    
+    </script>
     
     {% block page_scripts %}
     {% endblock %}

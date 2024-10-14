@@ -1,0 +1,22 @@
+<input type="hidden" name="known_collection" value="{{ form.known_collection.value }}">
+            
+<label for="related_collection">Related Collection:</label>
+<select id="related_collection" name="related_collection" placeholder="Choose...">
+    {% for value, label in form.related_collection.field.widget.choices %}
+        <option value="{{ value }}">{{ label }}</option>
+    {% endfor %}
+</select>
+
+<label for="relationship_to">Relationship To:</label>
+<select id="relationship_to" name="relationship_to" placeholder="Choose or add new...">
+    {% for value, label in form.relationship_to.field.widget.choices %}
+        <option value="{{ value }}">{{ label }}</option>
+    {% endfor %}
+</select>
+
+<label for="relationship_from">Relationship From:</label>
+<select id="relationship_from" name="relationship_from" placeholder="Choose or add new...">
+    {% for value, label in form.relationship_from.field.widget.choices %}
+        <option value="{{ value }}">{{ label }}</option>
+    {% endfor %}
+</select>

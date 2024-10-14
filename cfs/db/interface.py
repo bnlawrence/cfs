@@ -522,12 +522,12 @@ class ManifestInterface(GenericHandler):
     
 
 
-class RelationshipInterface(GenericHandler):   
-    def __init__(self):
-        super().__init__(Relationship)
-        self.collection=CollectionInterface()
+class RelationshipInterface(GenericInterface):
 
-    def add_single(self, collection_one, collection_two, relationship):
+    model = Relationship   
+    
+    @classmethod
+    def add_single(cls, collection_one, collection_two, relationship):
         """
         Add a oneway <relationship> between <collection_one> and <collection_two>.
         e.g. add_relationship('julius','betrayed_by','brutus')
@@ -538,21 +538,22 @@ class RelationshipInterface(GenericHandler):
         : returns : relationship instance
         """
         #def add_relationship(self, collection_one, collection_two, relationship):
-        c1 = self.collection.retrieve(name=collection_one)
-        c2 = self.collection.retrieve(name=collection_two)
-
+        c1 = CollectionInterface.retrieve(name=collection_one)
+        c2 = CollectionInterface.retrieve(name=collection_two)
         rel = Relationship(subject=c1, predicate=relationship, related_to=c2)
         rel.save()
         return rel
 
-    def delete_by_name(self, relationshipname):
+    @classmethod
+    def delete_by_name(cls, relationshipname):
         """
-        Delete a tag, from wherever it is used
+        Delete a relationship, from wherever it is used
         """
-        super().delete(name=relationshipname)
+        cls.model.delete(name=relationshipname)
 
+    @classmethod
     def add_double(
-        self, collection_one, collection_two, relationship_12, relationship_21):
+        cls, collection_one, collection_two, relationship_12, relationship_21):
         """
         Add a pair of relationships between <collection_one>  and <collection_two> such that
         collection_one has relationship_12 to collection_two and
@@ -561,18 +562,18 @@ class RelationshipInterface(GenericHandler):
         (It is possible to add a one way relationship by passing relationship_21=None)
         """
         #def add_relationships(
-        self.add_single(collection_one, collection_two, relationship_12)
+        cls.add_single(collection_one, collection_two, relationship_12)
         if relationship_21 is not None and collection_one != collection_two:
-            self.add_single(collection_two, collection_one, relationship_21)
+            cls.add_single(collection_two, collection_one, relationship_21)
 
-    
-    def retrieve(self, collection, outbound=True, relationship=None):
+    @classmethod
+    def retrieve(cls, collection, outbound=True, relationship=None):
         """
         Find all relationships from or to a  <collection>, optionally
         which have <relationship> as the predicate.
         """
         #def retrieve_relationships(self, collection, relationship=None):
-        c = self.collection.retrieve(name=collection)
+        c = CollectionInterface.retrieve(name=collection)
         if relationship:
             if outbound:
                 r = c.related_to.objects 
@@ -584,6 +585,19 @@ class RelationshipInterface(GenericHandler):
                 return c.related_to.all()
             else:
                 return c.subject.all()
+    
+    @classmethod
+    def get_triples(cls, collection):
+        """ Get all triples for a particular collection instance"""
+        print(collection.related_to.all())
+        outbound = [(r.predicate, r.related_to.name) for r in collection.related_to.all()]
+        inbound = [(r.predicate, r.subject.name) for r in collection.subject.all()]
+        return outbound, inbound
+    
+    @classmethod
+    def get_predicates(cls):
+        predicates = cls.model.objects.values_list('predicate', flat=True).distinct()
+        return predicates
 
 
 class TagInterface(GenericHandler):

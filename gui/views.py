@@ -1,5 +1,6 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse
+from django.urls import reverse
 from django.template.loader import render_to_string
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Count, Q
@@ -11,7 +12,9 @@ from rest_framework.decorators import api_view
 from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
                         Location, Collection)
 from cfs.db.interface import (VariableProperyInterface, VariableInterface,
-                              CollectionInterface)
+                              CollectionInterface, RelationshipInterface)
+
+from gui.forms import RelationshipForm
 
 from gui.serializers import VariableSerializer
 
@@ -185,11 +188,7 @@ def select_variables(request):
                 key_properties__properties__key='VL'
             ).values('key_properties__properties__value').distinct().count()
 
-        summary = f'<p>Total Results {n}. Includes <ul>'
-        summary += f"<li>{sdata['nspatial']} unique spatial domains, and </li>"
-        summary += f"<li>{sdata['ntime']} unique time domain(s),</li>"
-        summary += f"<li>from {nvariants} ensemble member(s).</li>"
-        summary+="</ul>"
+        summary = _summary(sdata, n, nvariants)
         #not enough work for a template
     else:
         summary=''
@@ -228,6 +227,15 @@ def select_variables(request):
 
     return JsonResponse(myresponse)
 
+def _summary(sdata, n, nvariants):
+     """ ok, could be done in template, but it's a bit trivial"""
+     shtml = f'<p>Total Results {n}. Includes <ul>'
+     shtml += f"<li>{sdata['nspatial']} unique spatial domains, and </li>"
+     shtml += f"<li>{sdata['ntime']} unique time domain(s),</li>"
+     shtml += f"<li>from {nvariants} ensemble member(s).</li>"
+     shtml+="</ul>"
+     return shtml
+    
 
 def _filterview(request):
     """ Common filtering operations"""
@@ -291,6 +299,7 @@ def delete_collection(request, id):
          return JsonResponse({'success': False, 'msg': str(e)})
   
 
+
 @api_view(['POST'])
 def get_collection(request):
     page_number = request.data.get('page')  # Default to page 1
@@ -314,11 +323,7 @@ def get_collection(request):
                 key_properties__properties__key='VL'
             ).values('key_properties__properties__value').distinct().count()
 
-        summary = f'<p>Total Results {n}. Includes <ul>'
-        summary += f"<li>{sdata['nspatial']} unique spatial domains, and </li>"
-        summary += f"<li>{sdata['ntime']} unique time domain(s),</li>"
-        summary += f"<li>from {nvariants} ensemble member(s).</li>"
-        summary+="</ul>"
+        summary = _summary(sdata,n,nvariants)
         #not enough work for a template
     else:
         summary=''
@@ -352,8 +357,43 @@ def get_collection(request):
     }
     if summary:
         myresponse['summary'] = summary
+        outbound, inbound = RelationshipInterface.get_triples(collection)
+        myresponse['related'] = render_to_string('gui/related.html',
+                                                 {'inbound':inbound, 'outbound':outbound})
+        form = RelationshipForm(initial={'known_collection': collection.name})
+        predicate_list = RelationshipInterface.get_predicates()
+        target_list = [(c.id,c.name) for c in CollectionInterface.all()]
+        target_list = [c for c in target_list if c!=(collection.id,collection.name)]
+        form.fields['related_collection'].widget.choices = target_list
+        form.fields['relationship_from'].widget.choices = [(p, p) for p in predicate_list]
+        form.fields['relationship_to'].widget.choices =  [(p, p) for p in predicate_list]
+        myresponse['relform'] = render_to_string('gui/relform.html', {'form':form})
+        print(myresponse['relform'])
 
     return JsonResponse(myresponse)
+
+@api_view(['POST'])
+def new_related(request):
+    form = RelationshipForm(request.POST)
+    if form.is_valid():
+        known_collection = form.cleaned_data['known_collection']
+        related_collection = form.cleaned_data['related_collection']
+        relationship_from = form.cleaned_data['relationship_from']
+        relationship_to = form.cleaned_data['relationship_to']
+        
+        subject = CollectionInterface.retrieve(name=known_collection)
+        object = CollectionInterface.retrieve(id=related_collection)
+
+        RelationshipInterface.add_single(subject.name, object.name, relationship_to)
+
+        if relationship_from: 
+            RelationshipInterface.add_single(object.name, subject.name, relationship_from)
+        
+    else:
+        print(form.errors)
+    
+    return redirect(reverse('collections'))
+    
     
 
 

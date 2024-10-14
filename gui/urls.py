@@ -31,6 +31,7 @@ urlpatterns = [
     path('api/update-collection-description/',views.update_collection_description, name ='update_collection_description'),
     path('api/delete-collection/<int:id>/',views.delete_collection, name='delete_collection'),
     path('api/get-variables-from-collection/', views.get_collection,name='get_collection'),
+    path('api/new-related',views.new_related,name='new_related'),
 
     # route for fetching available keys for variable property queries
     path('api/variable-property-keys/', views.get_available_keys, name='get_available_keys'),

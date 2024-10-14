@@ -19,6 +19,22 @@
         <div id="summary-content"></div>
         </div>
     </div>
+    <div id="action-area" class="rightblock">
+        <div class="block-container">
+            <h4> Related Collections </h4>
+            <div id="related-content"></div>
+        </div>
+        <div class="block-container">
+            <h4> Add Relationships </h4>
+            <form method="post" id="relationshipForm" action='/api/new-related'>
+                {% csrf_token %}
+                <div id="relform-content"></div>
+                <button type="submit">Submit</button>
+            </form>
+            
+        </div>
+
+    </div>
 </div>
 
 {% endblock %}
@@ -27,6 +43,26 @@
 <script>
     const container = document.getElementById('collection-table');
     let myLastViewButton = 0;
+
+    function initialiseRelatedSelects() {
+        // Initialize Tom Select on the dropdowns with 'create' option enabled
+        new TomSelect("#related_collection", {
+            create: false,  // Disable new options here if you don't want to allow new collections
+            maxItems: 1     // Single selection for related collection
+        });
+
+        new TomSelect("#relationship_from", {
+            create: true,  // Allow new entries for 'relationship_from'
+            maxItems: 1
+        });
+
+        new TomSelect("#relationship_to", {
+            create: true,  // Allow new entries for 'relationship_to'
+            maxItems: 1
+        });
+    }
+
+
 
     container.addEventListener('click', function(event) {
         if (event.target.classList.contains('editButton')) {
@@ -135,6 +171,11 @@
             // Only update the summary if it's present in the response (i.e., page 1)
             if (data.summary) {
                 document.getElementById('summary-content').innerHTML = data.summary;
+                document.getElementById('related-content').innerHTML = data.related;
+                let x = document.getElementById('relform-content');
+                console.log('x',x);
+                document.getElementById('relform-content').innerHTML = data.relform;
+                initialiseRelatedSelects();
             }
             const varHeader = document.getElementById('varHeader')
             console.log('varHeader', varHeader)
