@@ -7,6 +7,6 @@ Once you have atomic datasets, we need them to be unique, so we can handle quark
 The Variable model class is the key one for instantiating all the important logic, but it is the Variable interface
 that is used in the middleware logic.
 
-::: core.models.Variable
+::: cfs.models.Variable
 
-::: core.db.interface.VariableInterface
+::: cfs.db.interface.VariableInterface
