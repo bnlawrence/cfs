@@ -1,28 +1,30 @@
 @startuml 
 hide attributes
-class core.Cell_Method #e8f4d6 {
+class cfs.Cell_Method #d6f4dc {
     + id (BigAutoField)
     + method (CharField)
     + axis (CharField)
+    + qualifier (CharField)
+    + intervals (CharField)
 }
 
 
-class core.Cell_MethodSet #e8f4d6 {
+class cfs.Cell_MethodSet #d6f4dc {
     + id (BigAutoField)
     + key (CharField)
     # methods (ManyToManyField)
 }
-core.Cell_MethodSet o--o core.Cell_Method
+cfs.Cell_MethodSet o--o cfs.Cell_Method
 
 
-class core.CollectionType #e8f4d6 {
+class cfs.CollectionType #d6f4dc {
     - id (AutoField)
     + value (TextField)
     + key (CharField)
 }
 
 
-class core.Collection #e8f4d6 {
+class cfs.Collection #d6f4dc {
     + _proxied (JSONField)
     + name (CharField)
     + description (TextField)
@@ -31,12 +33,12 @@ class core.Collection #e8f4d6 {
     # tags (ManyToManyField)
     # variables (ManyToManyField)
 }
-core.Collection o--o core.CollectionType
-core.Collection o--o core.Tag
-core.Collection o--o core.Variable
+cfs.Collection o--o cfs.CollectionType
+cfs.Collection o--o cfs.Tag
+cfs.Collection o--o cfs.Variable
 
 
-class core.Domain #e8f4d6 {
+class cfs.Domain #d6f4dc {
     - id (AutoField)
     + name (CharField)
     + region (CharField)
@@ -50,7 +52,7 @@ class core.Domain #e8f4d6 {
 }
 
 
-class core.File #e8f4d6 {
+class cfs.File #d6f4dc {
     - id (AutoField)
     + name (CharField)
     + path (CharField)
@@ -62,18 +64,18 @@ class core.File #e8f4d6 {
     + format (CharField)
     # locations (ManyToManyField)
 }
-core.File o--o core.Location
-core.File .- core.File_type
+cfs.File o--o cfs.Location
+cfs.File .- cfs.File_type
 
 
-class core.Location #e8f4d6 {
+class cfs.Location #d6f4dc {
     - id (AutoField)
     + name (CharField)
     + volume (PositiveBigIntegerField)
 }
 
 
-class core.Manifest #e8f4d6 {
+class cfs.Manifest #d6f4dc {
     - id (AutoField)
     ~ cfa_file (ForeignKey)
     + bounds (BinaryField)
@@ -83,29 +85,30 @@ class core.Manifest #e8f4d6 {
     + parent_uuid (UUIDField)
     # fragments (ManyToManyField)
 }
-core.Manifest <--* core.File
-core.Manifest o--o core.File
+cfs.Manifest <--* cfs.File
+cfs.Manifest o--o cfs.File
 
 
-class core.Relationship #e8f4d6 {
+class cfs.Relationship #d6f4dc {
     + id (BigAutoField)
     + predicate (CharField)
     ~ subject (ForeignKey)
     ~ related_to (ForeignKey)
 }
-core.Relationship <--* core.Collection
-core.Relationship <--* core.Collection
+cfs.Relationship <--* cfs.Collection
+cfs.Relationship <--* cfs.Collection
 
 
-class core.Tag #e8f4d6 {
+class cfs.Tag #d6f4dc {
     - id (AutoField)
     + name (CharField)
 }
 
 
-class core.TimeDomain #e8f4d6 {
+class cfs.TimeDomain #d6f4dc {
     + id (BigAutoField)
     + interval (PositiveIntegerField)
+    + interval_offset (PositiveIntegerField)
     + interval_units (CharField)
     + units (CharField)
     + calendar (CharField)
@@ -114,33 +117,41 @@ class core.TimeDomain #e8f4d6 {
 }
 
 
-class core.VariableProperty #e8f4d6 {
+class cfs.VariableProperty #d6f4dc {
     - id (AutoField)
     + key (CharField)
     + value (CharField)
 }
-core.VariableProperty .- core.VariableProperty_key
+cfs.VariableProperty .- cfs.VariableProperty_key
 
 
-class core.Variable #e8f4d6 {
+class cfs.VariablePropertySet #d6f4dc {
+    + id (BigAutoField)
+    + key (CharField)
+    # properties (ManyToManyField)
+}
+cfs.VariablePropertySet o--o cfs.VariableProperty
+
+
+class cfs.Variable #d6f4dc {
     - id (AutoField)
     + _proxied (JSONField)
+    ~ key_properties (ForeignKey)
     ~ spatial_domain (ForeignKey)
     ~ time_domain (ForeignKey)
     ~ cell_methods (ForeignKey)
     ~ in_file (ForeignKey)
     ~ in_manifest (ForeignKey)
-    # key_properties (ManyToManyField)
 }
-core.Variable o--> core.Domain
-core.Variable o--> core.TimeDomain
-core.Variable o--> core.Cell_MethodSet
-core.Variable <--* core.File
-core.Variable o--> core.Manifest
-core.Variable o--o core.VariableProperty
+cfs.Variable o--> cfs.VariablePropertySet
+cfs.Variable o--> cfs.Domain
+cfs.Variable o--> cfs.TimeDomain
+cfs.Variable o--> cfs.Cell_MethodSet
+cfs.Variable <--* cfs.File
+cfs.Variable o--> cfs.Manifest
 
 
-enum core.File_type{
+enum cfs.File_type{
     + C - ('C', 'CFA File')
     + A - ('A', 'CFA File holds atomic dataset(s)')
     + Q - ('Q', 'CFA File holds quark(s)')
@@ -148,11 +159,18 @@ enum core.File_type{
     + F - ('F', 'Fragment File')
 }
 
-enum core.VariableProperty_key{
+enum cfs.VariableProperty_key{
     + SN - ('SN', 'standard_name')
     + LN - ('LN', 'long_name')
     + ID - ('ID', 'identity')
     + AO - ('AO', 'atomic_origin')
+    + F - ('F', 'frequency')
+    + S - ('S', 'source')
+    + SI - ('SI', 'source_id')
+    + VL - ('VL', 'variant_label')
+    + R - ('R', 'realm')
+    + E - ('E', 'experiment')
+    + RI - ('RI', 'runid')
 }
 
 @enduml

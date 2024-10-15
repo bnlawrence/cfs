@@ -128,12 +128,13 @@ class CFAhandler:
         #FIXME: Add tracking id
         #FIXME: All this file handling is brittle. Help David!
         self.arrived_at = time()
-        self.parsed+=1
-        files =  field.get_filenames()
+        files =  field.data.get_filenames()
         if self.dataset is None:
             cfa_file = [f for f in files if Path(f).suffix == '.cfa'][0]
             self.dataset = h5.File(cfa_file,'r')
 
+        # we can only do the sorting because we have timestamps. CF
+        # uses a set because aggregation could be multidimensionsonal
         filenames = sorted([f for f in files if Path(f).suffix !='.cfa'])
         tdim = field.dimension_coordinate('T', default=None)
         if tdim is not None:
