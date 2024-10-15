@@ -10,7 +10,10 @@
                     <div class="editable" data-id="{{collection.id}}">{{collection.description}}</div>
                     <button class="editButton">Edit</button> </td> </div>
                 <td><div class="more-container">more<div class="tooltip-content">{{collection.dump}}</td>
-                    <td><button class="viewButton" id="view-{{collection.id}}">View</view>&nbsp;<button class="deleteButton" id="{{collection.id}}">Delete</button></td>
+                    <td><button class="viewButton" id="view-{{collection.id}}">View</button>
+                        <button class="manifestButton" id="{{collection.id}}">Get Manifest</button>
+                        <button class="deleteButton" id="{{collection.id}}">Delete</button>
+                    </td>
             </tr>
         {% endfor %}
         </tbody>

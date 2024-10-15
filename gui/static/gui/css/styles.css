@@ -135,7 +135,7 @@ table.description-table th {
     margin-right: 10px;        /* Add some space between the text and the button */
 }
 
-.editButton {
+Button {
     /* Optional: Adjust the button appearance */
     padding: 5px 10px;
 }

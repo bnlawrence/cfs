@@ -9,6 +9,7 @@
 
 <label for="relationship_to">Relationship To:</label>
 <select id="relationship_to" name="relationship_to" placeholder="Choose or add new...">
+    <option value="" selected>Select a relationship</option>
     {% for value, label in form.relationship_to.field.widget.choices %}
         <option value="{{ value }}">{{ label }}</option>
     {% endfor %}
@@ -16,6 +17,7 @@
 
 <label for="relationship_from">Relationship From:</label>
 <select id="relationship_from" name="relationship_from" placeholder="Choose or add new...">
+    <option value="" selected>Select a relationship</option>
     {% for value, label in form.relationship_from.field.widget.choices %}
         <option value="{{ value }}">{{ label }}</option>
     {% endfor %}
