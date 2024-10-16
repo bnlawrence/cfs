@@ -63,7 +63,6 @@
     }
 
 
-
     container.addEventListener('click', function(event) {
         if (event.target.classList.contains('editButton')) {
             const editableDiv = event.target.previousElementSibling; // Get the corresponding editable div
@@ -185,6 +184,41 @@
             console.error('Error sending selected values:', error);
         }
     }
+
+    // Initialize TomSelect for all tag fields
+    document.querySelectorAll('select[id^="tags-"]').forEach(select => {
+        new TomSelect(select, {
+            create: true,  // Allow creation of new tags
+            persist: false,
+            plugins: ['remove_button']
+        });
+    });
+
+    // Event listener for form submissions
+    document.addEventListener('submit', function(event) {
+        if (event.target.classList.contains('tags-form')) {
+            event.preventDefault();
+            
+            let form = event.target;
+            let formData = new FormData(form);
+
+            // Submit the form via AJAX
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.success);
+                if (data.success) {
+                    alert(`Tags updated successfully for collection ${form.querySelector('input[name="collection_id"]').value}`);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    });
 </script>
 {% endblock%}
 

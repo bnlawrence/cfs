@@ -9,11 +9,26 @@
                     <div class="editable-container">
                     <div class="editable" data-id="{{collection.id}}">{{collection.description}}</div>
                     <button class="editButton">Edit</button> </td> </div>
-                <td><div class="more-container">more<div class="tooltip-content">{{collection.dump}}</td>
-                    <td><button class="viewButton" id="view-{{collection.id}}">View</button>
-                        <button class="manifestButton" onclick="window.location.href='{% url 'manifest' collection.id %}'">Get Manifest</button>
-                        <button class="deleteButton" id="{{collection.id}}">Delete</button>
-                    </td>
+                <td>
+                    <form method="post" id="tagForm-{{collection.id}}" action='/api/update-tags/{{collection.id}}/'>
+                        {% csrf_token %}
+                        <select id="tags-{{collection.id}}" name="tags[]" multiple>
+                            {% for tag in collection.tags.all %}
+                                <option value="{{ tag.name }}" selected>{{ tag.name }}</option>
+                            {% endfor %}
+                            {% for tag in tags %}
+                                {% if tag not in collection.tags.all %}
+                                    <option value="{{ tag.name }}">{{ tag.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                        <button type="submit">Update Tags</button>
+                    </form>
+                </td>
+                <td><button class="viewButton" id="view-{{collection.id}}">View</button>
+                    <button class="manifestButton" onclick="window.location.href='{% url 'manifest' collection.id %}'">Get Manifest</button>
+                    <button class="deleteButton" id="{{collection.id}}">Delete</button>
+                </td>
             </tr>
         {% endfor %}
         </tbody>

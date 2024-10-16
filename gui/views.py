@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse
 from django.template.loader import render_to_string
@@ -12,7 +12,8 @@ from rest_framework.decorators import api_view
 from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
                         Location, Collection)
 from cfs.db.interface import (VariableProperyInterface, VariableInterface,
-                              CollectionInterface, RelationshipInterface)
+                              CollectionInterface, RelationshipInterface,
+                              TagInterface)
 
 from gui.forms import RelationshipForm
 
@@ -35,7 +36,8 @@ def view(request):
 
 def collections(request):
     collections=CollectionInterface.retrieve_all()
-    return render(request,'gui/collections.html',context={'collections':collections})
+    tags = TagInterface.all()
+    return render(request,'gui/collections.html',context={'collections':collections,'tags':tags})
 
 def get_manifests(request, col_id):
     """ Return a serialised view of a manifest for downloading."""
@@ -418,6 +420,17 @@ def new_related(request):
     
     return redirect(reverse('collections'))
 
+@api_view(['POST'])
+def update_tags(request, collection_id):
+    
+    if request.method == 'POST':
+        # Handle adding new/existing tags via AJAX or standard form submission
+        tag_names = request.POST.getlist('tags[]')  # If using AJAX with TomSelect
+        print(tag_names)
+        TagInterface.add_to_collection(collection_id, tag_names)
+        return redirect(reverse('collections'))
+    else:
+        raise ValueError('Only receive posts')
 
 
 

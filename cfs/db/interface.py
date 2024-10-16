@@ -606,23 +606,38 @@ class RelationshipInterface(GenericInterface):
         return predicates
 
 
-class TagInterface(GenericHandler):
+class TagInterface(GenericInterface):
+    model = Tag
 
-    def __init__(self):
-        super().__init__(Tag)
-        self.collection=CollectionInterface()
-
-    def create(self,name):
+    @classmethod
+    def create(cls,name):
         super().create(name=name)
 
-    def add_to_collection(self, collection_name, tagname):
+    @classmethod
+    def add_to_collection(cls, collection, tag_or_taglist):
         """
-        Associate a tag with a collection
+        Associate a tag or tags with a collection
         """
-        tag, s = self.get_or_create(name=tagname)
-        c = self.collection.retrieve(name=collection_name)
-        c.tags.add(tag)
+        if isinstance(collection,str):
+            c = CollectionInterface.retrieve(name=collection)
+        elif isinstance(collection,int):
+            c = CollectionInterface.retrieve(id=collection)
+        else:
+            raise ValueError('Unknown type for collection in tag interface')
+        
+        if isinstance(tag_or_taglist,str):
+            tag_or_taglist = [tag_or_taglist]
+       
+        #tags = [t[0] for t in [cls.get_or_create(x) for x in tag_or_taglist]]
+        tags = []
+        for x in tag_or_taglist:
+            t, created= cls.get_or_create(name=x)
+            if created:
+                t.save()
+            tags.append(t)
+        c.tags.add(*tags)
 
+    @classmethod
     def remove_from_collection(self, collection_name, tagname):
         """
         Remove a tag from a collection
