@@ -31,7 +31,7 @@ def projects(request):
     return render(request,'gui/projects.html')
 
 def view(request):
-    return render(request,'gui/view1.html')
+    return render(request,'gui/selection.html')
 
 def collections(request):
     collections=CollectionInterface.retrieve_all()
