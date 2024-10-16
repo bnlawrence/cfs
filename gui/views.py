@@ -232,8 +232,6 @@ def select_variables(request):
         page_results = paginator.page(paginator.num_pages)
 
     serializer = VariableSerializer(page_results, many=True)
-    
-    print(serializer.data)
 
     html = render_to_string('gui/variable.html', {'results': serializer.data})
 
@@ -266,7 +264,6 @@ def _summary(sdata, n, nvariants):
 def _filterview(request):
     """ Common filtering operations"""
     selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
-    print(selections)
     properties_sname = set(selections['dd-sname'])
     properties_lname = set(selections['dd-lname'])
     properties_tave = set(selections['dd-tave'])
@@ -284,7 +281,6 @@ def _filterview(request):
 def add_to_collection(request):
     selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
     collection_name = request.data.get('collection_name')
-    print('A2S', selections, collection_name)
     results = _filterview(request)
     interface = CollectionInterface()
 
@@ -394,7 +390,7 @@ def get_collection(request):
         form.fields['relationship_from'].widget.choices = [(p, p) for p in predicate_list]
         form.fields['relationship_to'].widget.choices =  [(p, p) for p in predicate_list]
         myresponse['relform'] = render_to_string('gui/relform.html', {'form':form})
-        print(myresponse['relform'])
+      
 
     return JsonResponse(myresponse)
 

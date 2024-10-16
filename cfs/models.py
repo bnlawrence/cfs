@@ -46,7 +46,7 @@ class Cell_MethodSet(models.Model):
     methods = models.ManyToManyField(Cell_Method)
     key = models.CharField(max_length=64, unique=True)
     def __str__(self):
-        return ','.join([str(m) for m in self.methods.all()])
+        return ', '.join([str(m) for m in self.methods.all()])
 
     @staticmethod
     def generate_key(methods):
@@ -393,7 +393,10 @@ class TimeDomain(models.Model):
   
     
     def resolution(self):
-        return f'{self.interval} {self.units}'
+        if self.interval_offset:
+            return f'{self.interval} {self.interval_units} (offset {self.interval_offset})'
+        else:
+            return f'{self.interval} {self.interval_units}'
     
     def __str__(self):
         return f'From {self.starting} to {self.ending} ({self.units}, interval {self.interval})'
