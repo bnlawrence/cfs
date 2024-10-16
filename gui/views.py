@@ -18,6 +18,9 @@ from gui.forms import RelationshipForm
 
 from gui.serializers import VariableSerializer
 
+from io import BytesIO
+import zipfile
+
 # Create your views here.
 
 def index(request):
@@ -28,17 +31,38 @@ def projects(request):
     return render(request,'gui/projects.html')
 
 def view(request):
-    return render(request, 'gui/view.html')
-
-def oldview(request):
-    return render(request,'gui/view0.html')
-
-def view1(request):
     return render(request,'gui/view1.html')
 
 def collections(request):
     collections=CollectionInterface.retrieve_all()
     return render(request,'gui/collections.html',context={'collections':collections})
+
+def get_manifests(request, col_id):
+    """ Return a serialised view of a manifest for downloading."""
+    unique_manifests = CollectionInterface.unique_manifests(col_id)
+    name = CollectionInterface.retrieve(id=col_id).name
+
+    manifest_fragments = [manifest.fragments_as_text() for manifest in unique_manifests]
+    
+    if len(manifest_fragments) == 1:
+        file_name = f'{name}_manifest_1.txt'
+        response = HttpResponse(manifest_fragments[0], content_type="text/plain")
+        response['Content-Disposition'] = f'attachment; filename={file_name}'
+
+    else:
+        zip_buffer = BytesIO()
+        print('Manifests ',len(unique_manifests), len(manifest_fragments))
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            for manifest, fragments in zip(unique_manifests, manifest_fragments):
+                #print (manifest)
+                file_name = f'{name}_manifest_{manifest.id}.txt' 
+                zip_file.writestr(file_name, fragments)
+
+        response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
+        response['Content-Disposition'] = f'attachment; filename={name}_manifests.zip'
+
+    return response
+        
 
 ###
 ### API Rest queries follow
@@ -393,8 +417,9 @@ def new_related(request):
         print(form.errors)
     
     return redirect(reverse('collections'))
-    
-    
+
+
+
 
 
 

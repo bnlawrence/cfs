@@ -339,8 +339,14 @@ class CollectionInterface(GenericInterface):
         c.description = description
         c.save()
         return c
+    
+    @classmethod
+    def unique_manifests(cls, id):
+        c = Collection.objects.get(id=id)
+        variables = c.variables.all()
+        unique_manifests = Manifest.objects.filter(variable__in=variables).distinct()
+        return unique_manifests
 
-        
 
 class DomainInterface(GenericHandler):
         

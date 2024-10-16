@@ -345,6 +345,9 @@ class Manifest(models.Model):
         fcount = self.fragments.count()
         return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n             (first file {self.fragments.first()}).'
 
+    def fragments_as_text(self):
+        """ Download a list of fragments for action"""
+        return '\n'.join([f.name for f in self.fragments.all()])
 
 class Relationship(models.Model):
 

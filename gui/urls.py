@@ -8,12 +8,9 @@ urlpatterns = [
 
     #main search
     path('collections',views.collections,name='collections'),
-    path("view",views.view,name="view"),
-    path("view1",views.view1,name="selection"),
+    path("view1",views.view,name="selection"),
     path('projects',views.projects,name="projects"),
-
-    #main search
-    path("oldview",views.oldview,name="oldview"),
+    path('manifest/<int:col_id>/', views.get_manifests,name='manifest'),
 
     # cell methods
     path('api/cell-methods/', views.get_cell_methods, name='get_cell_methods'),
@@ -35,6 +32,5 @@ urlpatterns = [
 
     # route for fetching available keys for variable property queries
     path('api/variable-property-keys/', views.get_available_keys, name='get_available_keys'),
-
-    path('api/get-initial-options/',views.get_view_initial_options, name='get_view_initial_options'),
 ]
+   
