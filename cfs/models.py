@@ -131,8 +131,8 @@ class Collection(models.Model):
         nunique = unique_vars.count()
         if nunique > 0 and not force:
             raise PermissionError(f'Cannot empty collection {self} with unique variables with force=False')
-        if hasattr(self,'variables'):
-            for v in self.variables.all():
+        if force:
+            for v in unique_vars:
                 v.delete()
 
     def delete(self,*args,**kwargs):
