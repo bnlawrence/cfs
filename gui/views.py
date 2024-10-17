@@ -323,7 +323,6 @@ def delete_collection(request, id):
          return JsonResponse({'success': False, 'msg': str(e)}, status=500)
   
 
-
 @api_view(['POST'])
 def get_collection(request):
     page_number = request.data.get('page')  # Default to page 1

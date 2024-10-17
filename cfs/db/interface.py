@@ -241,9 +241,16 @@ class CollectionInterface(GenericInterface):
         Delete any related variables.
         """
         if isinstance(collection, str):
+            print('name deleting')
             collection = cls.retrieve(name=collection)
         elif isinstance(collection,int):
+            print('id deleting')
             collection = cls.retrieve(id=collection)
+            print(collection)
+        elif isinstance(collection,Collection):
+            pass
+        else:
+            raise ValueError('Unknown type of collection')
         collection.do_empty(force)
         super().delete(collection)
 

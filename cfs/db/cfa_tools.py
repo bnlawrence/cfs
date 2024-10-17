@@ -128,7 +128,10 @@ class CFAhandler:
         #FIXME: Add tracking id
         #FIXME: All this file handling is brittle. Help David!
         self.arrived_at = time()
-        files =  field.data.get_filenames()
+        # at the moment we need to do it from the field, so we do get the CFA file
+        # in the future, we can maybe use field.data.get_filenames since we 
+        # have access to this filename via other routes.
+        files =  field.get_filenames()
         if self.dataset is None:
             cfa_file = [f for f in files if Path(f).suffix == '.cfa'][0]
             self.dataset = h5.File(cfa_file,'r')

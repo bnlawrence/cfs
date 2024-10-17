@@ -251,8 +251,55 @@ def test_deletion(test_data):
     spatial = test_db.xydomain.retrieve_by_name('AnotherDomain')
     assert spatial is None, 'Failed to delete spatial domain as variable was deleted'
 
+def test_collections_and_uniqueness(test_data):
+    test_db, f, c  = test_data
+    c1name = 'c2 unique test'
+    c1 = test_db.collection.create(name=c1name)
+    cname = c.name
+    vars = test_db.variable.retrieve_in_collection(cname)
+    nvars = len(vars)
+    for v in vars:
+        test_db.variable.add_to_collection(c1name,v)
+    vars1 = test_db.variable.retrieve_in_collection(cname)
+    for v1,v2 in zip(vars,vars1):
+        assert str(v1) == str(v2)
+
+    test_db.collection.delete(c1name)
+    vars = test_db.variable.retrieve_in_collection(cname)
+    assert len(vars) == nvars
+
+def test_collection_empty_4_delete(test_data):
+    """ 
+    This tests vanilla deletion, with and without the force option.
+    """
+    test_db, f, c  = test_data
+    cname = c.name
+    vars = test_db.variable.retrieve_in_collection(cname)
+    nvars = len(vars)
+    for i,v in enumerate(vars):
+        v.delete()
+        if i == nvars-2:
+            break
+        with pytest.raises(PermissionError) as context:
+            test_db.collection.delete(c)
+    with pytest.raises(PermissionError) as context:
+        test_db.collection.delete(c)
+    vars = test_db.variable.retrieve_in_collection(cname)
+    test_db.collection.delete(c, force=True)
+    with pytest.raises(ValueError):
+        test_db.collection.retrieve(name=cname)
+
+
+
+
+
 def test_cleanup(test_data):
-    """ Should be deleting all this stuff that depends on these variables"""
+    """ 
+    Should be deleting all this stuff that depends on these variables.
+    At some point there were none left here, but we've left this in case
+    we add new tests which need cleaning up, and, most importantly,
+    keep on checking we have done away with the domains.
+    """
 
     test_db, f, c = test_data
 
