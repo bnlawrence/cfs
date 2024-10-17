@@ -313,12 +313,14 @@ def update_collection_description(request):
 @api_view(['DELETE'])
 def delete_collection(request, id):
     try:
-        CollectionInterface.delete_id(id)
-        return JsonResponse({'success': True, 'msg': 'Collection deleted successfully.'})
+        CollectionInterface.delete(id)
+        return JsonResponse({'success': True, 'msg': 'Collection deleted successfully.'}, status=200)
     except ObjectDoesNotExist:
-        return JsonResponse({'success': False, 'msg': 'Collection does not exist'})
+        return JsonResponse({'success': False, 'msg': 'Collection does not exist'}, status=404)
+    except PermissionError as e:
+        return JsonResponse({'success': False, 'msg': str(e)}, status=403)
     except Exception as e:
-         return JsonResponse({'success': False, 'msg': str(e)})
+         return JsonResponse({'success': False, 'msg': str(e)}, status=500)
   
 
 

@@ -131,17 +131,23 @@
             }
         })
         .then(response => {
-            if (response.ok) {
-                row.remove(); // Remove the row from the DOM
-            } else {
-                console.error('Failed to delete row');
+            if (!response.ok) {
+                // Parse the response JSON to extract the error message
+                return response.json().then(data => {
+                    throw new Error(data.msg);
+                });
             }
+            return response.json();
+        })
+        .then(data => {
+            row.remove(); // Remove the row from the DOM
+            cleanDisplay(); // remove display of existing variable
+
         })
         .catch(error => {
-            console.error('Error deleting row:', error);
+            showErrorModal(error.message);
         });
     }
-
 
     // Function to send selected values to the backend API and get results
     async function getCollection(id) {

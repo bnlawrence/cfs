@@ -139,3 +139,51 @@ Button {
     /* Optional: Adjust the button appearance */
     padding: 5px 10px;
 }
+
+.modal {
+    display: none;
+    z-index: 1000; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0, 0, 0, 0.7); /* Black w/ opacity */
+}
+  
+.modal.is-open {
+display: block;
+}
+
+.modal__container {
+    position: relative;
+    margin: auto;
+    padding: 20px;
+    width: 80%; /* Could be more or less, depending on screen size */
+    max-width: 500px; /* Set a max-width */
+    background: white; /* White background */
+    border-radius: 8px; /* Rounded corners */
+}
+
+/* Close Button Styles */
+.modal__close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    border: none;
+    background: transparent;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+/* Example of a heading inside the modal */
+.modal__header {
+    margin-bottom: 20px;
+}
+
+/* Example of content inside the modal */
+.modal__content {
+    margin-bottom: 20px;
+}
+
+    

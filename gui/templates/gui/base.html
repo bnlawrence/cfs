@@ -6,9 +6,10 @@
     {% load static %} 
     <meta name="csrf-token" content="{{ csrf_token }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-   
     <link href="{% static 'gui/css/styles.css' %}" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://unpkg.com/micromodal/dist/micromodal.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/js/tom-select.complete.min.js"></script>
 </head>
 <body>
     <!-- Navigation Menu -->
@@ -32,6 +33,25 @@
     </div>
     
     <div id="message-block"></div>
+    <!-- Modal HTML -->
+    <div class="modal micromodal-slide" id="error-modal" aria-hidden="true">
+        <div class="modal__overlay" tabindex="-1">
+        <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="modal-1-title">
+            <header class="modal__header">
+            <h2 class="modal__title" id="modal-1-title">
+                Error
+            </h2>
+            <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
+            </header>
+            <main class="modal__content" id="modal-1-content">
+            <p id="error-message">Something went wrong.</p>
+            </main>
+            <footer class="modal__footer">
+            <button class="modal__btn" data-micromodal-close>Close</button>
+            </footer>
+        </div>
+        </div>
+    </div>
 
     <!-- Main results area -->
     <div id="results" class="results-block" style="display:none;">
@@ -50,7 +70,7 @@
 
     <!-- Common scripts then page specific scripts follow -->
 
-    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.0.1/dist/js/tom-select.complete.min.js"></script>
+   
     <script>
         
 
@@ -63,6 +83,15 @@
         let currentPage = 1;
         let totalResults = 0;
         let resultsPerPage = 0;  // Initialize but get it from the backend later
+
+        // Function to display the error modal
+        function showErrorModal(errorMessage) {
+            // Set the error message in the modal
+            document.getElementById('error-message').textContent = errorMessage;
+        
+            // Show the modal using MicroModal
+            MicroModal.show('error-modal');
+        }
 
         /* Display Variable Results */ 
     
@@ -79,6 +108,15 @@
             document.getElementById('prev-page').disabled = currentPage === 1;
             document.getElementById('next-page').disabled = currentPage === totalPages;
             document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
+        }
+
+        // Function to clean up display
+        function cleanDisplay() {
+            currentPage = 1;
+            totalResults = 0;
+            resultsPerPage = 0; 
+            const container = document.getElementById('results');
+            container.style.display="none";
         }
     
         // Event listeners for pagination buttons
