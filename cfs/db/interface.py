@@ -621,10 +621,7 @@ class TagInterface(GenericInterface):
         super().create(name=name)
 
     @classmethod
-    def add_to_collection(cls, collection, tag_or_taglist):
-        """
-        Associate a tag or tags with a collection
-        """
+    def _handle_tags(cls, collection, tag_or_taglist):
         if isinstance(collection,str):
             c = CollectionInterface.retrieve(name=collection)
         elif isinstance(collection,int):
@@ -642,6 +639,15 @@ class TagInterface(GenericInterface):
             if created:
                 t.save()
             tags.append(t)
+        return c, tags
+
+
+    @classmethod
+    def add_to_collection(cls, collection, tag_or_taglist):
+        """
+        Associate a tag or tags with a collection
+        """
+        c, tags = cls._handle_tags(collection, tag_or_taglist)
         c.tags.add(*tags)
 
     @classmethod
@@ -653,6 +659,11 @@ class TagInterface(GenericInterface):
         tag = Tag(name=tagname)
         c.tags.remove(tag)
 
+    @classmethod
+    def set_collection_tags(cls, collection, tag_names):
+        c, tags = cls._handle_tags(collection, tag_names)
+        c.tags.set(tags)
+        
 
 class TimeInterface(GenericHandler):
     def __init__(self):

@@ -424,7 +424,7 @@ def update_tags(request, collection_id):
         # Handle adding new/existing tags via AJAX or standard form submission
         tag_names = request.POST.getlist('tags[]')  # If using AJAX with TomSelect
         print(tag_names)
-        TagInterface.add_to_collection(collection_id, tag_names)
+        TagInterface.set_collection_tags(collection_id, tag_names)
         return redirect(reverse('collections'))
     else:
         raise ValueError('Only receive posts')
