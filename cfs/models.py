@@ -6,6 +6,8 @@ import hashlib
 from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
+import cf
+
 
 from django.dispatch import receiver
 
@@ -382,7 +384,7 @@ class TimeDomain(models.Model):
     # offset
     interval_offset = models.PositiveIntegerField(null=True)
     # interval units
-    interval_units = models.CharField(max_length=3,default='d')
+    interval_units = models.CharField(max_length=12,default='d')
 
     # date units and calendar
     units = models.CharField(max_length=12,default='days')
@@ -390,8 +392,32 @@ class TimeDomain(models.Model):
     # start and end dates
     starting = models.FloatField()
     ending = models.FloatField()
-  
+
+    @property
+    def cfstart(self):
+        return cf.Data(self.starting, units=self.units, calendar=self.calendar)
     
+    @property
+    def cfend(self):
+        return cf.Data(self.ending, units=self.units, calendar=self.calendar)
+        
+    @property
+    def cfdelta(self):
+        if self.interval_units=='month' and self.calendar=='360_day':
+            return cf.Data(self.interval*30, units='day')
+        else:
+            return cf.Data(self.interval, units=self.interval_units)
+
+    @property
+    def nt(self):
+        """ The number of temporal samples within the TimeDomain"""
+        #FIXME: We expect nt to be a DB property in the future, use 
+        # that and calculate cfend.
+        nt = (self.cfend+self.cfdelta-self.cfstart)/self.cfdelta  
+        nt=round((nt.datum()/86400.))
+        return nt
+    
+    @property
     def resolution(self):
         if self.interval_offset:
             return f'{self.interval} {self.interval_units} (offset {self.interval_offset})'
@@ -399,7 +425,7 @@ class TimeDomain(models.Model):
             return f'{self.interval} {self.interval_units}'
     
     def __str__(self):
-        return f'From {self.starting} to {self.ending} ({self.units}, interval {self.interval})'
+        return f'From {self.cfstart} to {self.cfend} ({self.units}, interval {self.resolution})'
 
 
 class VariablePropertyKeys(models.TextChoices):

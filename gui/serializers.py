@@ -19,11 +19,19 @@ class TimeDomainSerializer(serializers.ModelSerializer):
         fields = ['starting','ending','interval']
     def to_representation(self, instance):
         representation = super().to_representation(instance)
-        representation['starting'] = str(cf.Data(instance.starting, 
-                                        units=instance.units,calendar=instance.calendar))
-        representation['ending'] = str(cf.Data(instance.ending, 
-                                        units=instance.units,calendar=instance.calendar))
-        representation['interval'] = instance.resolution()
+        # would it be quicker to check the rest was zeros with strftime, does it matter?
+        Y1, M1, D1, h1, m1, s1, _, _, _ = t = instance.cfstart.datetime_array.item().timetuple()
+        Y2, M2, D2, h2, m2, s2, _, _, _ = instance.cfend.datetime_array.item().timetuple()
+        if all(x==0 for x in (h1,m1,s1,h2,m2,s2)):
+            s = f'{Y1}-{M1:02d}-{D1:02d} {instance.calendar}'
+            e = f'{Y2}-{M2:02d}-{D2:02d} {instance.calendar}'
+        else:
+            s = instance.cfstart
+            e = instance.cfend
+
+        representation['starting'] = s
+        representation['ending'] = e
+        representation['interval'] = f'{instance.resolution} ({instance.nt} samples).'
         return representation
 
 class DomainSerializer(serializers.ModelSerializer):
