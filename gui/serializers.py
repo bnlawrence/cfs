@@ -37,13 +37,7 @@ class TimeDomainSerializer(serializers.ModelSerializer):
 class DomainSerializer(serializers.ModelSerializer):
     class Meta:
         model = Domain
-        fields = ['name','nominal_resolution','size','coordinates']
-    def to_representation(self,instance):
-        # make the size more human readable
-        representation = super().to_representation(instance)
-        size = sizeof_fmt(representation['size']*4)
-        representation['size'] = size
-        return representation
+        fields = ['name','nominal_resolution','coordinates']
 
 
 class VariableSerializer(serializers.ModelSerializer):
@@ -52,15 +46,19 @@ class VariableSerializer(serializers.ModelSerializer):
     spatial_domain = DomainSerializer(allow_null=True, read_only=True)
     # the following is the magic incantation to use the get_cell_methods function on this class:
     cell_methods = serializers.SerializerMethodField()
+    size = serializers.SerializerMethodField()
 
     class Meta:
         model = Variable
-        fields = ['key_properties','time_domain','spatial_domain','cell_methods']
+        fields = ['key_properties','time_domain','spatial_domain','cell_methods','size']
 
     def get_cell_methods(self, instance):
         if instance.cell_methods:
             return str(instance.cell_methods)
         return None
+    
+    def get_size(self, instance):
+        return sizeof_fmt(instance.size)
 
     def to_representation(self, instance):
         # Get the default representation

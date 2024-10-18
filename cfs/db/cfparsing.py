@@ -3,6 +3,7 @@ import numpy as np
 from cfs.db.cfa_tools import CFAhandler
 from time import time
 import logging
+import re
 logger = logging.getLogger(__name__)
 
 def manage_types(value):
@@ -81,7 +82,11 @@ def extract_cfsdomain(field, lookup_xy=LookupXY):
                the default Lookup class provided in this module.
     : returns : A dictionary of domain properties for the field provided.
     """
-    ydim = field.dimension_coordinate('Y').size
+    # I don't think we'd have data files without Y would we?
+    try:
+        ydim = field.dimension_coordinate('Y').size
+    except ValueError:
+        raise NotImplementedError("We didn't anticiapte data without a Y coordinate!")
     try:
         xdim = field.dimension_coordinate('X').size
         shape = (ydim,xdim)
@@ -89,9 +94,11 @@ def extract_cfsdomain(field, lookup_xy=LookupXY):
         shape = (ydim,)
     lookup = lookup_xy(shape)
     axis_names_sizes = field.domain._unique_domain_axis_identities()
-    spatial_coords = ','.join(sorted([x for x in axis_names_sizes.values() if 'time' not in x]))
+    spatial_coords = [x for x in axis_names_sizes.values() if 'time' not in x]
+    size = np.prod([int(re.search(r'\d+', x).group()) for x in spatial_coords])
+    spatial_coords = ', '.join(sorted(spatial_coords))
     domain_properties = {
-        'size':field.size,
+        'size':size,
         'coordinates': spatial_coords,
         'nominal_resolution': lookup.nominal_resolution,
         'name':lookup.name,

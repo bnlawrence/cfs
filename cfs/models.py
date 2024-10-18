@@ -552,6 +552,10 @@ class Variable(models.Model):
                 if value is not None:
                     s+= f'  {x}: {value}\n'
         return s
+    
+    @property
+    def size(self): 
+        return self.spatial_domain.size*self.time_domain.nt*4
 
     
     def dump(self, with_proxied=False):
