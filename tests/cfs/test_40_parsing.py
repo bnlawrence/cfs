@@ -67,6 +67,7 @@ def test_domain(inputfield):
     print(inputfield)
     d = extract_cfsdomain(inputfield)
     assert d['name'] == 'test'
+    assert d['size'] == 40
 
 def test_atomic_name(inputfield):
 

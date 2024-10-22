@@ -1,7 +1,8 @@
 from pathlib import Path
-import json
+import json, io
 import pytest
 import numpy as np
+import cf
 
 from cfs.db.standalone import setup_django
 
@@ -42,13 +43,35 @@ def test_canari_eg1(test_db):
     manifests = data['manifests']
     maniset = {}
     for m in manifests:
-        m['bounds'] = np.array(m['bounds'])
+        binary = io.BytesIO()
+        np.save(binary, np.array(m['bounds']))
+        m['bounds'] = binary.getvalue()
         maniset[m['manikey']] = m
     filedata={'properties':cfafile,
               'manifests':maniset,
               'variables':data['variables']}
     test_db.collection.create(name='canari_fail1')
+    test_db.location.create(name='canari_eg1')
     test_db.upload_file_to_collection('canari_eg1','canari_fail1',filedata)
+
+
+def test_quarks(django_dependencies):
+    test_db, ignore , ignore = django_dependencies
+    vars = test_db.variable.all()
+    v = vars[0]
+    td = v.time_domain
+    
+    #check get sensibele results from trying to get the same thing
+    starting = cf.Data(td.starting, units=cf.Units(td.units, calendar=td.calendar))
+    ending = cf.Data(td.ending, units=cf.Units(td.units, calendar=td.calendar))
+    manifest = v.in_manifest
+    print(f'variable {v} has manifest {manifest}')
+    assert manifest is not None
+    print(starting, ending)
+    quark = test_db.manifest.make_quark(manifest, starting, ending)
+    assert quark.id == manifest.id
+    
+    
 
 
     

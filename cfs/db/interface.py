@@ -3,14 +3,16 @@ import os
 from django import template
 from django.db import transaction
 from django.db.models import Q, Count,OuterRef, Subquery
+from cfs.db.cfa_tools import get_quark_field
 
 from cfs.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
                             Domain, File, FileType, Location, Manifest,  
                             VariableProperty, VariablePropertyKeys,
                             Relationship, Tag, TimeDomain, Variable)
-
+import io
+import numpy as np
 from time import time
-
+from uuid import uuid4
 
 import logging
 logger = logging.getLogger(__name__)
@@ -55,7 +57,7 @@ class GenericInterface:
         """ Retrieve a single instance. """
         results = cls.model.objects.filter(**kwargs)
         if results.count() == 0:
-            raise ValueError(f'No such {cls.model} instance with {kwargs}')
+            raise cls.model.DoesNotExist
         elif results.count() > 1:
             raise ValueError(f'Unable to match a single {cls.model.__name__}.')
         return results.first()
@@ -390,28 +392,35 @@ class DomainInterface(GenericHandler):
         return Domain.objects.all()
 
 
-class FileInterface(GenericHandler):
-    
-    def __init__(self):
-        super().__init__(File)
-        self.location=LocationInterface()
+class FileInterface(GenericInterface):
+    model = File
 
-    def _doloc(self, properties):
+    @classmethod
+    def _doloc(cls, properties):
         location = properties.pop('location',None)
         if location is None:
             raise ValueError('Cannot create a file without putting it in a location')
         if not isinstance(location,Location):
-            location, created = self.location.get_or_create(name=location)
+            location, created = LocationInterface.get_or_create(name=location)
         return properties, location
 
+    @classmethod
+    def retrieve(cls,**kw):
+        """ Retrieve a file """
+        try:
+            return super().retrieve(**kw)
+        except File.DoesNotExist:
+            raise FileNotFoundError
 
-    def findall_with_variable(self, variable):
+    @classmethod
+    def findall_with_variable(cls, variable):
         """
         Find all files with a given variable
         """
         return variable.in_files.all()
     
-    def findall_by_type(self,type):
+    @classmethod
+    def findall_by_type(cls,type):
         """
         Find all files of a given type 
         """
@@ -419,6 +428,7 @@ class FileInterface(GenericHandler):
             raise ValueError(f'Cannot query files by invalid type {type}')
         return File.objects.filter(type=type).all()
     
+    @classmethod
     def findall_from_variableset(self, variables):
         """ 
         Find all files from a given set of variables
@@ -426,19 +436,21 @@ class FileInterface(GenericHandler):
         files = File.objects.filter(variable__in=variables)
         return files
     
-    def create(self, props):
+    @classmethod
+    def create(cls, props):
 
         properties = props.copy()
-        properties, location = self._doloc(properties)
+        properties, location = cls._doloc(properties)
         file = super().create(**properties)
         file.locations.add(location)
         location.volume += file.size
         location.save()
         return file
     
-    def get_or_create(self, props):
+    @classmethod
+    def get_or_create(cls, props):
         properties = props.copy()
-        properties, location = self._doloc(properties)
+        properties, location = cls._doloc(properties)
         file, created = super().get_or_create(**properties)
         if not created and location in file.locations.all():
             logger.warning('Adding an existing file to a location where it already exists')
@@ -448,38 +460,41 @@ class FileInterface(GenericHandler):
             location.save()
         return file, created
     
+    @classmethod
     def in_location(self, location_name):
-
         return File.objects.filter(locations__name=location_name).all()
         
     
-class LocationInterface(GenericHandler):
-    def __init__(self):
-        super().__init__(Location)
+class LocationInterface(GenericInterface):
+    model = Location
 
-    def create(self, name):
+    @classmethod
+    def create(cls, name):
         return super().create(name=name)
 
-    def retrieve(self, location_name):
+    @classmethod
+    def retrieve(cls, location_name):
         return super().retrieve(name=location_name)
 
-    def find_all(self):
+    @classmethod
+    def find_all(cls):
         return Location.objects.all()
     
-    def delete(self, name):
-        instance = self.retrieve(name)
+    @classmethod
+    def delete(cls, name):
+        instance = cls.retrieve(name)
         instance.delete()
 
-    def get_or_create(self,name):
+    @classmethod
+    def get_or_create(cls,name):
         return super().get_or_create(name=name)
 
 
-class ManifestInterface(GenericHandler):
-    def __init__(self):
-        super().__init__(Manifest)
-        self.location = LocationInterface()
+class ManifestInterface(GenericInterface):
+    model = Manifest
 
-    def add(self, properties):
+    @classmethod
+    def add(cls, properties):
         """
         Add a CFA manifest
         This should always be unique.
@@ -494,7 +509,7 @@ class ManifestInterface(GenericHandler):
         for k,f in fragments.items():
             base = f.pop('base',None)
             if base is not None:
-                loc, created = self.location.get_or_create(base)
+                loc, created = LocationInterface.get_or_create(base)
                 f['location']=loc
         properties.pop('_bounds_ncvar')  #not intended for the database
         with transaction.atomic():
@@ -529,10 +544,29 @@ class ManifestInterface(GenericHandler):
             # no saves needed, all done by the transaction
         return m
 
-    def get_or_create(self):
-        """ We do not want to allow access to the superclass method"""
-        raise NotImplemented
-    
+    @classmethod
+    def make_quark(cls, manifest, start_date, end_date):
+        """ Make a quark subset of this particular atomic dataset manifest """
+
+        quark_field = get_quark_field(manifest, start_date, end_date)
+        print(quark_field)
+        print(quark_field.data.array)
+        fragments = [FileInterface.retrieve(id=f.id) for f in quark_field.data.array.tolist()]
+        tdim = quark_field.dimension_coordinate('T', default=None)
+        bounds = tdim.bounds.data.array
+        binary_stream = io.BytesIO()
+        np.save(binary_stream, bounds)
+        bounds = binary_stream.getvalue()
+        quark, created = ManifestInterface.get_or_create(cfa_file=manifest.cfa_file,
+                         fragments = fragments.data.array,
+                         bounds = bounds,
+                         units = quark_field.units,
+                         calendar = quark_field.calendar,
+        )
+        if created: 
+            quark.uuid = uuid4()
+            quark.save()
+        return quark
 
 
 class RelationshipInterface(GenericInterface):

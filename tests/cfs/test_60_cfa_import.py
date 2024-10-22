@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 from cfs.db.standalone import setup_django
-
+from django.core.exceptions import ObjectDoesNotExist
 
 VARIABLE_LIST = ['specific_humidity',]
 
@@ -177,7 +177,7 @@ def test_deletion(django_dependencies):
     #ok now test that deleting it with force, does remove the variable, files, and fragments.
     collection.delete(force=True)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ObjectDoesNotExist):
         test_db.collection.retrieve(name='posix_cfa_example')
 
     n_all_variables = test_db.variable.count()

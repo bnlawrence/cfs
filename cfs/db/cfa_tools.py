@@ -1,10 +1,12 @@
 from pathlib import Path
 import h5netcdf as h5
 import numpy as np
-import uuid
+import uuid, io
 from time import time
 import hashlib
 import logging
+import cf
+
 logger = logging.getLogger(__name__)
 
 def consistent_hash(mylist):
@@ -16,6 +18,46 @@ def consistent_hash(mylist):
     # Convert the list of tuples to a string representation
     data = str(tuple_list).encode('utf-8')
     return hashlib.md5(data).hexdigest()
+
+def get_quark_field(instance, start_date, end_date):
+    """ Given a CFS manifest field (i.e. an instance of the Manifest class 
+    found in the django models.py) and a pair of bounding dates, return
+    a CF field instance with the information needed to construct a 
+    subspace manifest.
+    : instance : A CFS manifest instance
+    : start_date : A date in a cf.Data instance
+    : end_date : A date in a cf.Data instance.
+    : output : A CF field instance with the correct bounds, and 
+    a set of fragment ids in the field data.
+    """
+
+    fld = cf.Field(properties={'long_name':'fragments'})
+    
+    fragments = np.array([f.id for f in instance.fragments.all()])
+    fld.set_data(fragments)
+
+    binary_stream = io.BytesIO(instance.bounds)
+    binary_stream.seek(0)
+    bounds = np.load(binary_stream)
+
+    timedata = np.mean(bounds, axis=1)
+    domain_axis = cf.DomainAxis(len(timedata))
+    
+    dimT = cf.DimensionCoordinate(properties={'standard_name':'time',
+                    'units':cf.Units(instance.units,calendar=instance.calendar)},
+                data = timedata,
+                bounds = cf.Bounds(data=bounds)
+                )
+    
+    fld.set_construct(domain_axis)
+    fld.set_construct(dimT)
+    print(fld)
+    nf, nt = len(fragments), len(timedata)
+    if nf != nt:
+        raise RuntimeError(
+            'Number of of manifest fragments ({nf}) not equal to time data length ({nt}).')
+    quark = fld.subspace(time=cf.wi(start_date, end_date))
+    return quark
 
 
 class CFAManifest:
@@ -73,8 +115,12 @@ class CFAManifest:
         """
         self.units = units
         self.calendar = calendar
-        self.bounds = bounds
         self._bounds_ncvar = ncvar
+
+        binary_stream = io.BytesIO()
+        np.save(binary_stream, bounds)
+        self.bounds = binary_stream.getvalue()
+
 
     @classmethod
     def from_dbdict(cls, dbdict):

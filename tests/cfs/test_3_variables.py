@@ -1,4 +1,5 @@
 from cfs.db.standalone import setup_django
+from django.core.exceptions import ObjectDoesNotExist
 from pathlib import Path
 from cfdm import cellmethod
 from django.db import connection
@@ -286,7 +287,7 @@ def test_collection_empty_4_delete(test_data):
         test_db.collection.delete(c)
     vars = test_db.variable.retrieve_in_collection(cname)
     test_db.collection.delete(c, force=True)
-    with pytest.raises(ValueError):
+    with pytest.raises(ObjectDoesNotExist):
         test_db.collection.retrieve(name=cname)
 
 
