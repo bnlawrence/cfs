@@ -300,6 +300,35 @@ class File(models.Model):
         super().delete(*args,**kwargs)
 
 
+class FileSet(models.Model):
+    """ 
+    Provides a single view of a set of files, e.g. associated with
+    a manifest. We need this to simplify concepts of uniqueness, and 
+    improve performance in filtering.
+    """
+    files = models.ManyToManyField(File)
+    key = models.CharField(max_length=64, unique=True)
+
+    def __str__(self):
+        return ','.join([str(f) for f in self.files.all()])
+
+    @staticmethod
+    def generate_key(files):
+        """Generate a unique key (e.g., hash) for a list of property ids."""
+        file_ids = sorted([str(f.id) for f in files])
+        key_string = ",".join(file_ids)
+        return hashlib.md5(key_string.encode('utf-8')).hexdigest()
+
+    @classmethod
+    def get_or_create_from_files(cls, files):
+        """Retrieve or create a FileSet based on the list of files."""
+        key = cls.generate_key(files)
+        file_set, created = cls.objects.get_or_create(key=key)
+        if created:
+            file_set.files.set(files) 
+        return file_set, created
+
+
 class Location(models.Model):
   
     class Meta:
@@ -330,26 +359,37 @@ class Manifest(models.Model):
 
     id = models.AutoField(primary_key=True)
     cfa_file = models.ForeignKey(File, on_delete=models.CASCADE, related_name="manifests")
-    fragments = models.ManyToManyField(File,related_name='fragment_set')
+    fragments = models.ForeignKey(FileSet, null=True, on_delete=models.CASCADE)
     bounds = models.BinaryField(null=True)
     units = models.CharField(null=True, max_length=20)
     calendar = models.CharField(null=True,max_length=20)
     total_size = models.PositiveBigIntegerField(null=True)
     parent_uuid = models.UUIDField(null=True)
+    is_quark = models.BooleanField(default=False)
+    
 
     def delete(self,*args,**kwargs):
         ignore = kwargs.pop('islastvar',None)
-        for f in self.fragments.all():
-            f.delete()
+        if self.is_quark:
+            self.fragments.delete()
+        else:
+            if not self.is_quark:
+                for f in self.fragments.files.all():
+                    f.delete()
+            self.fragments.delete()
         super().delete(*args,**kwargs)
 
     def __str__(self):
-        fcount = self.fragments.count()
-        return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n             (first file {self.fragments.first()}).'
+        fcount = self.fragment_count()
+        return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n             (first file {self.fragments.files.first()}).'
 
     def fragments_as_text(self):
         """ Download a list of fragments for action"""
-        return '\n'.join([f.name for f in self.fragments.all()])
+        fragments = self.fragments.files.all()
+        return '\n'.join([f.name for f in fragments])
+    
+    def fragment_count(self):
+        return self.fragments.files.count()
 
 class Relationship(models.Model):
 

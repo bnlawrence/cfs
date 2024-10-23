@@ -8,6 +8,7 @@ import logging
 import cf
 
 logger = logging.getLogger(__name__)
+logger.setLevel('WARN')
 
 def consistent_hash(mylist):
     """ 
@@ -33,15 +34,15 @@ def get_quark_field(instance, start_date, end_date):
 
     fld = cf.Field(properties={'long_name':'fragments'})
     
-    fragments = np.array([f.id for f in instance.fragments.all()])
-    fld.set_data(fragments)
+    fragments = np.array([f.id for f in instance.fragments.files.all()])
+    T_axis= fld.set_construct(cf.DomainAxis(fragments.size))
+    fld.set_data(fragments, axes=T_axis)
 
     binary_stream = io.BytesIO(instance.bounds)
     binary_stream.seek(0)
     bounds = np.load(binary_stream)
 
     timedata = np.mean(bounds, axis=1)
-    domain_axis = cf.DomainAxis(len(timedata))
     
     dimT = cf.DimensionCoordinate(properties={'standard_name':'time',
                     'units':cf.Units(instance.units,calendar=instance.calendar)},
@@ -49,8 +50,8 @@ def get_quark_field(instance, start_date, end_date):
                 bounds = cf.Bounds(data=bounds)
                 )
     
-    fld.set_construct(domain_axis)
-    fld.set_construct(dimT)
+    fld.set_construct(dimT, axes=T_axis)
+
     print(fld)
     nf, nt = len(fragments), len(timedata)
     if nf != nt:

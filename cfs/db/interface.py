@@ -6,7 +6,7 @@ from django.db.models import Q, Count,OuterRef, Subquery
 from cfs.db.cfa_tools import get_quark_field
 
 from cfs.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
-                            Domain, File, FileType, Location, Manifest,  
+                            Domain, File, FileSet, FileType, Location, Manifest,  
                             VariableProperty, VariablePropertyKeys,
                             Relationship, Tag, TimeDomain, Variable)
 import io
@@ -513,10 +513,10 @@ class ManifestInterface(GenericInterface):
                 f['location']=loc
         properties.pop('_bounds_ncvar')  #not intended for the database
         with transaction.atomic():
-            # we do this directly for efficiency, and to bypass
+            # We do this directly for efficiency, and to bypass
             # the interface file check on size, which we may not know
             # for fragment files.
-            m = Manifest.objects.create(**properties)
+           
             # extract locations and prepare file objects 
             locations = [f.pop('location',None) for f in fragments.values()]
 
@@ -540,7 +540,15 @@ class ManifestInterface(GenericInterface):
             # now we can add the locations
             for loc, f in zip(locations,all_files):
                 f.locations.add(loc)
-            m.fragments.add(*all_files)
+
+            # Combine both newly created and existing files
+            all_files = file_objects + existing_files
+            fileset, created = FileSet.get_or_create_from_files(all_files)
+            properties['fragments'] = fileset
+
+            #nowcreate the manifest
+            m = Manifest.objects.create(**properties)
+            
             # no saves needed, all done by the transaction
         return m
 
@@ -549,23 +557,25 @@ class ManifestInterface(GenericInterface):
         """ Make a quark subset of this particular atomic dataset manifest """
 
         quark_field = get_quark_field(manifest, start_date, end_date)
-        print(quark_field)
-        print(quark_field.data.array)
-        fragments = [FileInterface.retrieve(id=f.id) for f in quark_field.data.array.tolist()]
+        print(quark_field.data)
+        print(type(quark_field.data.array))
+        fragments = [FileInterface.retrieve(id=f) for f in quark_field.data.array.tolist()]
         tdim = quark_field.dimension_coordinate('T', default=None)
         bounds = tdim.bounds.data.array
         binary_stream = io.BytesIO()
         np.save(binary_stream, bounds)
         bounds = binary_stream.getvalue()
-        quark, created = ManifestInterface.get_or_create(cfa_file=manifest.cfa_file,
-                         fragments = fragments.data.array,
+        fileset, _ = FileSet.get_or_create_from_files(fragments)
+        quark, created = cls.get_or_create(cfa_file=manifest.cfa_file,
+                         fragments = fileset,
                          bounds = bounds,
-                         units = quark_field.units,
-                         calendar = quark_field.calendar,
+                         units = tdim.units,
+                         calendar = tdim.calendar,
         )
         if created: 
             quark.uuid = uuid4()
             quark.save()
+
         return quark
 
 

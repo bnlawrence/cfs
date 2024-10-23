@@ -139,7 +139,7 @@ def test_manifest(django_dependencies):
     manifests = test_db.manifest.all()
     assert test_db.manifest.count() == 1
 
-    assert manifests[0].fragments.count() == 3
+    assert manifests[0].fragment_count() == 3
 
 
 def test_variable(django_dependencies):
