@@ -10,6 +10,14 @@ import cf
 logger = logging.getLogger(__name__)
 logger.setLevel('WARN')
 
+def bounds_range(bounds_array):
+    """ Convenience tool for looking at the bounds
+    of a cf field"""
+    x = bounds_array.data[0]
+    y = bounds_array.data[-1]
+    print('Bounds range ',x,y)
+
+
 def consistent_hash(mylist):
     """ 
     Generate a hash that can be reused accross program runs, python's
@@ -49,15 +57,16 @@ def get_quark_field(instance, start_date, end_date):
                 data = timedata,
                 bounds = cf.Bounds(data=bounds)
                 )
-    
+    bounds_range(dimT.bounds)
     fld.set_construct(dimT, axes=T_axis)
-
-    print(fld)
     nf, nt = len(fragments), len(timedata)
     if nf != nt:
         raise RuntimeError(
             'Number of of manifest fragments ({nf}) not equal to time data length ({nt}).')
-    quark = fld.subspace(time=cf.wi(start_date, end_date))
+    print('Subspacing using cellwi to ',start_date, end_date)
+    quark = fld.subspace(time=cf.cellwi(start_date, end_date))
+    dimT = quark.dimension_coordinate('T')
+    bounds_range(dimT.bounds)
     return quark
 
 

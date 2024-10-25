@@ -6,6 +6,7 @@ setup(
     author_email='bryan.lawrence@ncas.ac.uk',
     description='cfstore: lightweight tool for storing CF file information in a database',
     packages=find_packages(),
+    include_package_data=True,
     scripts=[], 
     install_requires = [
         'django',
