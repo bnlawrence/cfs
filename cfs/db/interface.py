@@ -555,13 +555,13 @@ class ManifestInterface(GenericInterface):
     @classmethod
     def make_quark(cls, manifest, start_date, end_date):
         """ Make a quark subset of this particular atomic dataset manifest """
-
         quark_field = get_quark_field(manifest, start_date, end_date)
         print(quark_field.data)
         print(type(quark_field.data.array))
         fragments = [FileInterface.retrieve(id=f) for f in quark_field.data.array.tolist()]
         tdim = quark_field.dimension_coordinate('T', default=None)
         bounds = tdim.bounds.data.array
+        print(bounds.shape, bounds[-1], tdim.bounds[-1])
         binary_stream = io.BytesIO()
         np.save(binary_stream, bounds)
         bounds = binary_stream.getvalue()
@@ -574,6 +574,7 @@ class ManifestInterface(GenericInterface):
         )
         if created: 
             quark.uuid = uuid4()
+            quark.is_quark = True
             quark.save()
 
         return quark

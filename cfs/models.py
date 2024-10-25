@@ -391,6 +391,7 @@ class Manifest(models.Model):
     def fragment_count(self):
         return self.fragments.files.count()
 
+
 class Relationship(models.Model):
 
     class Meta:

@@ -66,7 +66,7 @@ class Posix:
             self.db.collection.add_type(c,'_type',intent)
 
         args = [
-            path_to_collection_head,
+            str(path_to_collection_head),
             collection_name,
             collection_description,
             subcollections,
