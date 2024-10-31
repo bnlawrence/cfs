@@ -28,6 +28,13 @@ def consistent_hash(mylist):
     data = str(tuple_list).encode('utf-8')
     return hashlib.md5(data).hexdigest()
 
+def cf_cells_overlap(value0, value1, units=None):
+    """ Will be in next CF release"""
+    #FIXME: When in general release, remove 
+    return cf.Query("ge", value0, units=units, attr="upper_bounds") & cf.Query(
+        "le", value1, units=units, attr="lower_bounds"
+    )
+
 def get_quark_field(instance, start_date, end_date):
     """ Given a CFS manifest field (i.e. an instance of the Manifest class 
     found in the django models.py) and a pair of bounding dates, return
@@ -64,7 +71,8 @@ def get_quark_field(instance, start_date, end_date):
         raise RuntimeError(
             'Number of of manifest fragments ({nf}) not equal to time data length ({nt}).')
     print('Subspacing using cellwi to ',start_date, end_date)
-    quark = fld.subspace(time=cf.cellwi(start_date, end_date))
+
+    quark = fld.subspace(time=cf_cells_overlap(start_date, end_date))
     dimT = quark.dimension_coordinate('T')
     bounds_range(dimT.bounds)
     return quark

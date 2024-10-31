@@ -91,9 +91,9 @@ def test_quarks(django_dependencies):
     assert quark.id != manifest.id
     assert quark.is_quark is True
     print(quark)
-    expected = 'cn134a_999_6hr_u_pt_cordex__197012-197012.nc(unavailable)'
+    expected = 'cn134a_999_6hr_u_pt_cordex__197012-197012.nc'
     fragments = list(quark.fragments.files.all())
-    assert expected == fragments[-1]
+    assert expected == fragments[-1].name
    
 
 
