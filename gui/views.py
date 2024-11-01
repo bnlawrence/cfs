@@ -15,7 +15,7 @@ from cfs.db.interface import (VariableProperyInterface, VariableInterface,
                               CollectionInterface, RelationshipInterface,
                               TagInterface)
 
-from gui.forms import RelationshipForm
+from gui.forms import RelationshipForm, DateRangeForm
 
 from gui.serializers import VariableSerializer
 
@@ -32,7 +32,8 @@ def projects(request):
     return render(request,'gui/projects.html')
 
 def view(request):
-    return render(request,'gui/selection.html')
+ 
+    return render(request,'gui/selection.html',{'form':DateRangeForm})
 
 def collections(request):
     collections=CollectionInterface.retrieve_all()
@@ -196,7 +197,9 @@ def entity_select(request):
 @api_view(['POST'])
 def select_variables(request):
     page_number = request.data.get('page')  # Default to page 1
-    results = _filterview(request)
+    
+    selections = request.data.get('selections') 
+    results = _filterview(selections)
 
     print(f'Before ordering and distinction we have {results.count()} variables')
     # We need to order the results, so we're doing it this way:
@@ -261,9 +264,8 @@ def _summary(sdata, n, nvariants):
      return shtml
     
 
-def _filterview(request):
+def _filterview(selections):
     """ Common filtering operations"""
-    selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
     properties_sname = set(selections['dd-sname'])
     properties_lname = set(selections['dd-lname'])
     properties_tave = set(selections['dd-tave'])
@@ -276,12 +278,39 @@ def _filterview(request):
         results = results.filter(contained_in__in=collections)
     return results
 
+@api_view(['POST'])
+def make_quarks(request):
+
+    selections = request.data.pop('selections')
+    results = _filterview(selections)
+    form = DateRangeForm(request.data)
+    if form.is_valid():
+        # Process data
+        quark_name = form.cleaned_data['quark_name']
+        start_day = form.cleaned_data['start_day']
+        start_month = form.cleaned_data['start_month']
+        start_year = form.cleaned_data['start_year']
+        end_day = form.cleaned_data['end_day']
+        end_month = form.cleaned_data['end_month']
+        end_year = form.cleaned_data['end_year']
+
+        interface=CollectionInterface()
+        try:
+            interface.make_quarks(quark_name, (start_day,start_month,start_year),
+                             (end_day,end_month,end_year), results)
+        except Exception as e:
+            return JsonResponse({'message': 'Invalid data', 'errors': str(e)}, status=400)
+        return JsonResponse({'message': 'Quark collection created successfully!'}, status=200)
+    else:
+        return JsonResponse({'message': 'Invalid data', 'errors': form.errors}, status=400)
+  
 
 @api_view(['POST'])
 def add_to_collection(request):
-    selections = request.data.get('selections')  # Get the selections (use request.data for DRF)
+    
     collection_name = request.data.get('collection_name')
-    results = _filterview(request)
+    selections = request.data.get('selections') 
+    results = _filterview(selections)
     interface = CollectionInterface()
 
     try:

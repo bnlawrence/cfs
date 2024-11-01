@@ -355,6 +355,33 @@ class CollectionInterface(GenericInterface):
         variables = c.variables.all()
         unique_manifests = Manifest.objects.filter(variable__in=variables).distinct()
         return unique_manifests
+    
+    @classmethod
+    def make_quarks(cls, collection_name, start_tuple, end_tuple, variables):
+        """
+        Makes a new collection and subsets the variables to the start and
+        end range (i.e creates new variables, maybe a new time domain,
+        and probably a new manifest).
+
+        :param collection_name: Intended name of quark collection
+        :type collection_name: string
+        :param start_tuple: start date, day, mon, year, integers
+        :type start_tuple: tuple
+        :param end_tuple: end date
+        :type end_tuple: tuple
+        :param variables: Set of variables
+        :type variables: Django queryset
+        :raises PermissionError: Collection already exists
+        :return: None
+        """
+        cls.create(name=collection_name,description="Quark")
+        print(start_tuple, end_tuple, variables)
+        #FIXME
+        #get all manifests corresponding to this set of variables
+        #make or get all the quark manifests
+        #make or get all the relevant time domains
+        #create all the new variables
+
 
 
 class DomainInterface(GenericHandler):
