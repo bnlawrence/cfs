@@ -19,18 +19,9 @@ It is very important to use aggregation in conjunction with CFStore, to avoid bo
 
 This means that if you have lots of files,  you really must aggregate your data using CFA _before_ uploading, otherwise each variable in each file will be treated as an atomic dataset!
 
+Once you have atomic datasets, we need them to be unique, so we can handle quarks (subsets, and/or replicants, in different locations) properly. The logic for creating quarks is important: the interface for making quarks is the `subset` method of the VariableInterface (see below):
 
-
-
-
-
-
-
-
-Once you have atomic datasets, we need them to be unique, so we can handle quarks (subsets, and/or replicants, in different locations) properly.
-
-The Variable model class is the key one for instantiating all the important logic, but it is the Variable interface
-that is used in the middleware logic.
+The Variable model class is the key one for instantiating all the important logic, but it is the Variable interface that is used in the middleware logic.
 
 ::: cfs.models.Variable
 

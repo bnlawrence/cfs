@@ -7,6 +7,7 @@ from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
 import cf
+import math
 
 
 from django.dispatch import receiver
@@ -666,9 +667,14 @@ class Variable(models.Model):
         We have our own specific get_or_create_unique_instance method
         (calls __check_uniqueness__)
         """
+        def clean_proxied_data(data):
+            return {k: (v if not (isinstance(v, float) and math.isnan(v)) else None) for k, v in data.items()}
+        _proxied = clean_proxied_data(_proxied)
+
         unique, instance =  cls.__check_uniqueness(key_properties, _proxied, spatial_domain, time_domain, cell_methods, 
                                       in_file, in_manifest)
         if unique:
+           
             key_properties_set, _ = VariablePropertySet.get_or_create_from_properties(key_properties)
             new_instance = cls(
                 _proxied=_proxied,
@@ -685,8 +691,12 @@ class Variable(models.Model):
                 new_instance.save()
             except:
                 logger.debug('Crash coming. Details follow')
+                logger.debug(_proxied)
                 logger.debug(new_instance._vars(with_proxied=False))
                 logger.debug(key_properties)
+                import json
+                jd = json.dumps(_proxied)
+                logger.debug(jd)
                 raise
 
             return new_instance, True  # Return the new instance and a flag indicating creation
@@ -730,6 +740,9 @@ class Variable(models.Model):
     def delete(self,*args,**kwargs):
         self.predelete()
         super().delete(*args,**kwargs)
+
+ 
+
 
 
    

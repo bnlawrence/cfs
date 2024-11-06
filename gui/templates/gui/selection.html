@@ -330,7 +330,6 @@
             console.log('Quarking');
             const selectedValues = getSelectedValues(); 
             const data = {
-                csrfmiddlewaretoken: document.querySelector('[name=csrfmiddlewaretoken]').value,
                 start_day: document.getElementById('day1').value,
                 start_month: document.getElementById('mon1').value,
                 start_year: document.getElementById('yr1').value,
@@ -345,7 +344,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRFToken': data.csrfmiddlewaretoken
+                        'X-CSRFToken': getCookie()
                     },
                     body: JSON.stringify(data)
                 });

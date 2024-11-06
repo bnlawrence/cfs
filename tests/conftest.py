@@ -26,7 +26,7 @@ def inputfield():
                             'units': '1'})
 
     # Create the domain axis constructs
-    domain_axisT = cf.DomainAxis(3)
+    domain_axisT = cf.DomainAxis(4)
     domain_axisY = cf.DomainAxis(5)
     domain_axisX = cf.DomainAxis(8)
 
@@ -39,7 +39,7 @@ def inputfield():
     axisX = Q.set_construct(domain_axisX)
 
     # Create and insert the field construct data
-    data = cf.Data(np.arange(120.).reshape(3, 5, 8))
+    data = cf.Data(np.arange(160.).reshape(4, 5, 8))
     Q.set_data(data)
 
     # Create the cell method constructs
@@ -55,8 +55,8 @@ def inputfield():
     Q.set_construct(cell_method2)
 
     # Create a "time" dimension coordinate construct with no bounds
-    tdata = [15,45,75]
-    bdata = [[1,30],[31,60],[61,90]]
+    tdata = [15,45,75,105]
+    bdata = [[1,30],[31,60],[61,90],[91,120]]
     dimT = cf.DimensionCoordinate(
                 properties={'standard_name': 'time',
                             'units': 

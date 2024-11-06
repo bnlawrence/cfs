@@ -46,10 +46,10 @@ def cfa_only(tmp_path, inputfield):
     f3 = f1.copy()
 
     # there will be a more elegant way of doing this, but this is fine for now
-    new_dates1 = np.array([105,135,165])
-    new_bounds1 = np.array([[91,120],[121,150],[151,180]])
-    new_dates2 = new_dates1 + 90
-    new_bounds2 = new_bounds1 + 90
+    new_dates1 = np.array([135,165,195,225])
+    new_bounds1 = np.array([[121,150],[151,180],[181,210],[211,240]])
+    new_dates2 = new_dates1 + 120
+    new_bounds2 = new_bounds1 + 120
 
     for nd, nb, f in zip([new_dates1,new_dates2], [new_bounds1, new_bounds2],[f2,f3]):
         dimT = cf.DimensionCoordinate(

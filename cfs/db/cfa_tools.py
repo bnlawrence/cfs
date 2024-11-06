@@ -16,6 +16,7 @@ def bounds_range(bounds_array):
     x = bounds_array.data[0]
     y = bounds_array.data[-1]
     print('Bounds range ',x,y)
+    return x[:,0],y[:,-1]
 
 
 def consistent_hash(mylist):
@@ -56,7 +57,7 @@ def get_quark_field(instance, start_date, end_date):
     binary_stream = io.BytesIO(instance.bounds)
     binary_stream.seek(0)
     bounds = np.load(binary_stream)
-
+   
     timedata = np.mean(bounds, axis=1)
     
     dimT = cf.DimensionCoordinate(properties={'standard_name':'time',
@@ -64,7 +65,10 @@ def get_quark_field(instance, start_date, end_date):
                 data = timedata,
                 bounds = cf.Bounds(data=bounds)
                 )
-    bounds_range(dimT.bounds)
+    left, right = bounds_range(dimT.bounds)
+    if start_date < left or end_date > right:
+        raise ValueError(f'Cannot find a quark manifest: Dates {start_date},{end_date} not within {left}{right}')
+    
     fld.set_construct(dimT, axes=T_axis)
     nf, nt = len(fragments), len(timedata)
     if nf != nt:

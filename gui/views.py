@@ -299,6 +299,7 @@ def make_quarks(request):
             interface.make_quarks(quark_name, (start_day,start_month,start_year),
                              (end_day,end_month,end_year), results)
         except Exception as e:
+            print(str(e))
             return JsonResponse({'message': 'Invalid data', 'errors': str(e)}, status=400)
         return JsonResponse({'message': 'Quark collection created successfully!'}, status=200)
     else:

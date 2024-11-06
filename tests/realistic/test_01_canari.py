@@ -80,14 +80,14 @@ def test_quarks(django_dependencies):
     ending = cf.Data(td.ending, units=cf.Units(td.units, calendar=td.calendar))
     manifest = v.in_manifest
     assert manifest is not None
-    quark = test_db.manifest.make_quark(manifest, starting, ending)
+    quark, created = test_db.manifest.subset(manifest, starting, ending)
     assert quark.id == manifest.id
     assert quark.is_quark is False
 
     #ok, now see if we can get a subset
     ending = cf.Data(10., units=cf.Units(
         'days since 1970-11-30',calendar='360_day'))
-    quark = test_db.manifest.make_quark(manifest, starting, ending)
+    quark, created = test_db.manifest.subset(manifest, starting, ending)
     assert quark.id != manifest.id
     assert quark.is_quark is True
     print(quark)

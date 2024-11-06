@@ -7,9 +7,10 @@ from cfs.db.cfa_tools import get_quark_field
 
 from cfs.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
                             Domain, File, FileSet, FileType, Location, Manifest,  
-                            VariableProperty, VariablePropertyKeys,
+                            VariableProperty, VariablePropertyKeys, VariablePropertySet,
                             Relationship, Tag, TimeDomain, Variable)
 import io
+import cf
 import numpy as np
 from time import time
 from uuid import uuid4
@@ -204,7 +205,8 @@ class CellMethodsInterface(GenericHandler):
 class CollectionInterface(GenericInterface):
     model = Collection
 
-    def create(self, **kw):
+    @classmethod
+    def create(cls, **kw):
         """ Convenience Interface to handle proxied keywords """
 
         proxied = kw.pop('_proxied',{})
@@ -374,9 +376,21 @@ class CollectionInterface(GenericInterface):
         :raises PermissionError: Collection already exists
         :return: None
         """
-        cls.create(name=collection_name,description="Quark")
         print(start_tuple, end_tuple, variables)
-        #FIXME
+        quark=cls.create(name=collection_name,description="Quark")
+        created, mcreated, tcreated = 0,0,0
+        for v in variables:
+            v,c,m,t = VariableInterface.subset(v,start_tuple, end_tuple)
+            quark.variables.add(v)
+            if c:
+                created+=1
+            if m:
+                mcreated+=1
+            if t:
+                tcreated+=1
+        outcome = f"Created {created} variables, {tcreated} timedomains, and {mcreated} manifests"
+        print(outcome)
+
         #get all manifests corresponding to this set of variables
         #make or get all the quark manifests
         #make or get all the relevant time domains
@@ -580,15 +594,12 @@ class ManifestInterface(GenericInterface):
         return m
 
     @classmethod
-    def make_quark(cls, manifest, start_date, end_date):
+    def subset(cls, manifest, start_date, end_date):
         """ Make a quark subset of this particular atomic dataset manifest """
         quark_field = get_quark_field(manifest, start_date, end_date)
-        print(quark_field.data)
-        print(type(quark_field.data.array))
         fragments = [FileInterface.retrieve(id=f) for f in quark_field.data.array.tolist()]
         tdim = quark_field.dimension_coordinate('T', default=None)
         bounds = tdim.bounds.data.array
-        print(bounds.shape, bounds[-1], tdim.bounds[-1])
         binary_stream = io.BytesIO()
         np.save(binary_stream, bounds)
         bounds = binary_stream.getvalue()
@@ -602,9 +613,8 @@ class ManifestInterface(GenericInterface):
         if created: 
             quark.uuid = uuid4()
             quark.is_quark = True
-            quark.save()
 
-        return quark
+        return quark,created
 
 
 class RelationshipInterface(GenericInterface):
@@ -737,15 +747,33 @@ class TagInterface(GenericInterface):
         c.tags.set(tags)
         
 
-class TimeInterface(GenericHandler):
-    def __init__(self):
-        super().__init__(TimeDomain)
-    def get_or_create(self,kw):
+class TimeInterface(GenericInterface):
+    model = TimeDomain
+    @classmethod
+    def get_or_create(cls,kw):
         if kw == {}:
             td = None
         else: 
              td, created = super().get_or_create(**kw)
         return td
+    @classmethod
+    def subset(cls, td, start_date, end_date):
+        """
+        Return a TimeDomain instance which is a subset of the td instance,
+        which runs from start_tuple to end tuple.
+
+        :raises ValueError: Tuple out of bounds
+        :return: time subset
+        :rtype: TimeDomain instance
+        """
+        if start_date < td.starting or end_date > td.ending:
+            raise ValueError('Attempt to subset timedomain is outside domain')
+        values = {}
+        for arg in ['interval','interval_offset','interval_units','calendar']:
+            values[arg]=getattr(td,arg)
+        values['starting']=start_date.data.array.item()
+        values['ending']=end_date.data.array.item()
+        return cls.model.objects.get_or_create(**values)
    
 
 class VariableProperyInterface:
@@ -776,35 +804,34 @@ class VariableProperyInterface:
        
 
 
-class VariableInterface(GenericHandler):
-    def __init__(self):
-        super().__init__(Variable)
-        self.varprops = {v:k for k, v in VariablePropertyKeys.choices}
-        self.xydomain=DomainInterface()
-        self.tdomain=TimeInterface()
-        self.cellm=CellMethodsInterface()
-        self.file = FileInterface()
+class VariableInterface(GenericInterface):
+    model = Variable
+    varprops = {v:k for k, v in VariablePropertyKeys.choices}   
+    xydomain=DomainInterface()
+    tdomain=TimeInterface()
+    cellm=CellMethodsInterface()
+    file = FileInterface()
 
-    def _construct_properties(self,varprops, ignore_proxy=False):
+    @classmethod
+    def _construct_properties(cls, varprops, ignore_proxy=False):
         """ 
         Used to parse a set of variable properties in words into appropriate
         model instances for inserting and querying the database
         """
-
-        definition, extras = {'key_properties':[]},{}
-        
+        definition,extras= {'key_properties':[]},{}
+      
         for key in varprops:
             if key in VariablePropertyKeys.labels:
-                ekey = self.varprops[key]
+                ekey = cls.varprops[key]
                 out_value, _ = VariableProperty.objects.get_or_create(
                                         key=ekey, value=varprops[key])
                 definition['key_properties'].append(out_value)
             elif key == 'spatial_domain':
-                definition[key]=self.xydomain.get_or_create(varprops[key])
+                definition[key]=cls.xydomain.get_or_create(varprops[key])
             elif key == 'time_domain':
-                definition[key]=self.tdomain.get_or_create(varprops[key])
+                definition[key]=cls.tdomain.get_or_create(varprops[key])
             elif key == 'cell_methods':
-                method_set = self.cellm.set_get_or_create(varprops[key])
+                method_set = cls.cellm.set_get_or_create(varprops[key])
                 definition[key]=method_set
             elif key in ['in_file','in_manifest']:
                 definition[key]=varprops[key]
@@ -817,7 +844,8 @@ class VariableInterface(GenericHandler):
                 definition[x] = None
         return definition
     
-    def add_to_collection(self, collection, variable):
+    @staticmethod
+    def add_to_collection(collection, variable):
         """
         Add variable to a collection
         """
@@ -826,8 +854,8 @@ class VariableInterface(GenericHandler):
         c.variables.add(variable)
         c.save()
 
-    @classmethod
-    def filter_by_property_keys(cls, list_of_keysets):
+    @staticmethod
+    def filter_by_property_keys(list_of_keysets):
         """ 
         Return a queryset of variables which have been
         filtered by the key properties which lie in
@@ -840,12 +868,13 @@ class VariableInterface(GenericHandler):
                 results = results.filter(key_properties__properties__id__in=value)
         return results
         
-
-    def retrieve_by_keyvalue(self, key, value):
+    @classmethod
+    def retrieve_by_keyvalue(cls, key, value):
         """Retrieve single variable by arbitrary property"""
-        return self.retrieve({key:value})
+        return cls.retrieve({key:value})
 
-    def retrieve_by_queries(self, queries, from_collection=None):
+    @classmethod
+    def retrieve_by_queries(cls, queries, from_collection=None):
         """Retrieve variable by a list of common query types, limit queries to collection
         if wished.
         Each element of the list is a key,value pair
@@ -908,16 +937,17 @@ class VariableInterface(GenericHandler):
         else:
             return base.all()
     
-
-    def retrieve_in_collection(self, collection_name):
+    @staticmethod
+    def retrieve_in_collection(collection_name):
         C = Collection.objects.get(name=collection_name)
         return C.variables.all()
     
-    def retrieve_all_collections(self, variable):
+    @staticmethod
+    def retrieve_all_collections(variable):
         return variable.contained_in.all()
 
-    
-    def get_or_create(self, varprops, unique=True):
+    @classmethod
+    def get_or_create(cls, varprops, unique=True):
         """
         If there is a variable corresponding to varprops with the same full set of properties, 
         return it, otherwise create it. Varprops should be a dictionary which includes at least 
@@ -926,7 +956,7 @@ class VariableInterface(GenericHandler):
         value of unique.
         """
         try:
-            props = self._construct_properties(varprops)
+            props = cls._construct_properties(varprops)
         except:
             logger.debug('Crash coming')
             logger.debug(varprops)
@@ -939,18 +969,21 @@ class VariableInterface(GenericHandler):
         args = [props[k] for k in ['_proxied','key_properties','spatial_domain',
                                    'time_domain','cell_methods','in_file','in_manifest']]
         var, created = Variable.get_or_create_unique_instance(*args)
+        
         if unique and not created:
             raise PermissionError('Attempt to re-create existing variable {var}')
         return var
     
-    def all(self):
+    @staticmethod
+    def all():
         return Variable.objects.all()
 
-    def retrieve_by_key(self, key, value):
-        return self.retrieve_by_queries([(key,value),])
+    @classmethod
+    def retrieve_by_key(cls, key, value):
+        return cls.retrieve_by_queries([(key,value),])
 
-
-    def retrieve_by_properties(self, properties, from_collection=None, unique=False):
+    @classmethod
+    def retrieve_by_properties(cls, properties, from_collection=None, unique=False):
         """
         Retrieve variable by arbitrary set of properties expressed as a dictionary.
         (Basically an interface to retrieve_by_queries.)
@@ -962,24 +995,93 @@ class VariableInterface(GenericHandler):
                 v = properties.pop(k)
                 if k == 'in_file':
                     if not isinstance(v, File):
-                        v = self.file.retrieve(**v)
+                        v = cls.file.retrieve(**v)
                     queries.append((k,v))
                 elif k == 'cell_methods':
                     for x in v:
-                        cm = self.cellm.retrieve(x)
+                        cm = cls.cellm.retrieve(x)
                         queries.append(('cell_methods', cm))
-        properties = self._construct_properties(properties)
+        properties = cls._construct_properties(properties)
         for present in ['_proxied','key_properties','cell_methods']:
             if not properties[present]:
                 properties.pop(present)
         for k, v in properties.items():
             queries.append((k,v))
-        results = self.retrieve_by_queries(queries, from_collection=from_collection)
+        results = cls.retrieve_by_queries(queries, from_collection=from_collection)
         if unique:
             if len(results) > 1:
                 raise ValueError('Query retrieved multiple variables ({c}) - but uniqueness was requested')
         return results
         
+    @classmethod
+    def subset(cls, v, start_tuple, end_tuple):
+        """ Make a quark of a variable, v, which is inclusive of
+        the start and end tuples provided. This method converts those
+        date tuples to dates in the units and calendar which correpond
+        to the time domain of the existing variable.  It then tries
+        to find the smallest possible manifest within
+        the required dates. If the manifest exists, it is used, if
+        not it is created. If necessary a new time domain instance
+        is created, and then a new or existing variable with the
+        quark dimensions is returned.
+        """
+        td = v.time_domain
+        myunits = cf.Units(td.units, calendar=td.calendar)
+        start_date = cf.Data(cf.dt(start_tuple[2], start_tuple[1], start_tuple[0]), units=myunits)
+        end_date = cf.Data(cf.dt(end_tuple[2], end_tuple[1], end_tuple[0]), units=myunits)
+        
+        mf = v.in_manifest
+        mf, mcreated = ManifestInterface.subset(mf, start_date, end_date)
+        if mcreated:
+            mf.save()
+            td, tcreated = TimeInterface.subset(td, start_date, end_date)
+            if tcreated:
+                td.save()
+        else:
+            # if the manifest already exists, the situation is more complicated,
+            # but I think we simply need to find a variable with the same
+            # manifest, as it's time domain must be the same (at least in
+            # terms of bounds),
+            td = Variable.objects.filter(in_manifest=mf).first().time_domain
+            tcreated=False
+            #my_cells = v.cell_methods
+            #var1 = Variable.objects(in_manifest=mf).filter(cell_methods=my_cells).first()
+            #td = var1.time_domain
+
+    
+        # Update the properties with subset results
+        props = {
+            'key_properties': v.key_properties,
+            'spatial_domain': v.spatial_domain,
+            'time_domain': td,
+            'cell_methods': v.cell_methods,
+            'in_file': v.in_file,
+            'in_manifest': mf,
+            '_proxied': v._proxied  # We'll compare this manually
+        }
+
+        # Filter on all fields except _proxied
+        filter_criteria = {
+            'key_properties': v.key_properties,
+            'spatial_domain': v.spatial_domain,
+            'time_domain': td,
+            'cell_methods': v.cell_methods,
+            'in_file': v.in_file,
+            'in_manifest': mf,
+        }
+        
+        # Find candidates and then verify _proxied manually
+        candidate = cls.model.objects.filter(**filter_criteria).first()
+        if candidate and candidate._proxied == v._proxied:
+            created = False
+            newv = candidate
+        else:
+            newv = cls.model(**props)
+            newv.save()
+            created = True
+
+        return newv, created, mcreated, tcreated
+
 
 class CollectionDB:
 
