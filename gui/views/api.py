@@ -1,75 +1,20 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import HttpResponse, JsonResponse
-from django.urls import reverse
-from django.template.loader import render_to_string
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Count, Q
-from django.core.exceptions import ObjectDoesNotExist
-
+# views/api.py
 from rest_framework.response import Response
 from rest_framework.decorators import api_view
-
-from cfs.models import (VariableProperty, VariablePropertyKeys, Variable, Cell_Method,
-                        Location, Collection)
+from django.http import JsonResponse
+from django.shortcuts import redirect
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.urls import reverse
+from django.template.loader import render_to_string
+from gui.forms import RelationshipForm, DateRangeForm
+from django.db.models import Count
+from django.core.exceptions import ObjectDoesNotExist
+from cfs.models import VariableProperty, Cell_Method, Collection, Variable, Location
 from cfs.db.interface import (VariableProperyInterface, VariableInterface,
                               CollectionInterface, RelationshipInterface,
-                              TagInterface)
-
-from gui.forms import RelationshipForm, DateRangeForm
-
+                              TagInterface, VariablePropertyKeys)
 from gui.serializers import VariableSerializer
-
-from io import BytesIO
-import zipfile
-
-# Create your views here.
-
-def index(request):
-    """ Core index view """
-    return render(request,'gui/home.html')
-
-def projects(request):
-    return render(request,'gui/projects.html')
-
-def view(request):
- 
-    return render(request,'gui/selection.html',{'form':DateRangeForm})
-
-def collections(request):
-    collections=CollectionInterface.retrieve_all()
-    tags = TagInterface.all()
-    return render(request,'gui/collections.html',context={'collections':collections,'tags':tags})
-
-def get_manifests(request, col_id):
-    """ Return a serialised view of a manifest for downloading."""
-    unique_manifests = CollectionInterface.unique_manifests(col_id)
-    name = CollectionInterface.retrieve(id=col_id).name
-
-    manifest_fragments = [manifest.fragments_as_text() for manifest in unique_manifests]
-    
-    if len(manifest_fragments) == 1:
-        file_name = f'{name}_manifest_1.txt'
-        response = HttpResponse(manifest_fragments[0], content_type="text/plain")
-        response['Content-Disposition'] = f'attachment; filename={file_name}'
-
-    else:
-        zip_buffer = BytesIO()
-        print('Manifests ',len(unique_manifests), len(manifest_fragments))
-        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-            for manifest, fragments in zip(unique_manifests, manifest_fragments):
-                #print (manifest)
-                file_name = f'{name}_manifest_{manifest.id}.txt' 
-                zip_file.writestr(file_name, fragments)
-
-        response = HttpResponse(zip_buffer.getvalue(), content_type="application/zip")
-        response['Content-Disposition'] = f'attachment; filename={name}_manifests.zip'
-
-    return response
-        
-
-###
-### API Rest queries follow
-###
+from .helpers import _filterview, _summary
 
 @api_view(['GET'])
 def get_variable_property_by_key(request):
@@ -254,29 +199,7 @@ def select_variables(request):
 
     return JsonResponse(myresponse)
 
-def _summary(sdata, n, nvariants):
-     """ ok, could be done in template, but it's a bit trivial"""
-     shtml = f'<p>Total Results {n}. Includes <ul>'
-     shtml += f"<li>{sdata['nspatial']} unique spatial domains, and </li>"
-     shtml += f"<li>{sdata['ntime']} unique time domain(s),</li>"
-     shtml += f"<li>from {nvariants} ensemble member(s).</li>"
-     shtml+="</ul>"
-     return shtml
-    
 
-def _filterview(selections):
-    """ Common filtering operations"""
-    properties_sname = set(selections['dd-sname'])
-    properties_lname = set(selections['dd-lname'])
-    properties_tave = set(selections['dd-tave'])
-    properties_ens = set(selections['dd-ens'])
-    collections = set(selections['dd-col'])
-    results = VariableInterface.filter_by_property_keys(
-        [properties_sname, properties_lname, properties_tave, properties_ens]
-        )
-    if collections:
-        results = results.filter(contained_in__in=collections)
-    return results
 
 @api_view(['POST'])
 def make_quarks(request):
@@ -300,10 +223,10 @@ def make_quarks(request):
                              (end_day,end_month,end_year), results)
         except Exception as e:
             print(str(e))
-            return JsonResponse({'message': f'Invalid data ({e})', 'errors': str(e)}, status=400)
+            return JsonResponse({'message': 'Invalid data', 'errors': str(e)}, status=400)
         return JsonResponse({'message': 'Quark collection created successfully!'}, status=200)
     else:
-        return JsonResponse({'message': f'Invalid data ({e})', 'errors': form.errors}, status=400)
+        return JsonResponse({'message': 'Invalid data', 'errors': form.errors}, status=400)
   
 
 @api_view(['POST'])
