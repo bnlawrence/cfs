@@ -38,25 +38,33 @@ def cfa_only(tmp_path, inputfield):
 
     filenames = [posix_path/f'test_file{x}.nc' for x in range(3)]
     for v,f in zip(fields,filenames):
-        cf.write([v,],f)
-
-    f = cf.read(posix_path.glob('*.nc'))
+        cf.write(v, f)
+    print ('YYYYYY', list(posix_path.glob('*.nc')))
+    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')
+    print(f)
+    print (f[0].get_filenames())
     cfa_file = posix_path/'test_file.cfa'
     #FIXME: I don't think the substitutions are being parsed properly.
-    cf.write(f, cfa_file, cfa={'absolute_paths':False,
-                               'substitutions':{'base':'./'}})
+    cf.write(f, cfa_file, cfa={"constructs": "field", "uri": "relative"}) 
+#                               'substitutions':{'base':'./'}})
     print('CFA setup with three files and one field')
-
+    g = cf.read(cfa_file)
+    print (g[0].get_filenames())
+    
     return posix_path
 
 def test_cfa_handler(cfa_only):
 
     fields = cf.read(cfa_only.glob('*.cfa'))
-
+    print (list(    cfa_only.glob('*.cfa')))
+    print (fields)
+    
     c = CFAhandler(expected_fields=len(fields))
 
     for f in fields:
-
+        print(f)
+        print (f.array)
+        print (f.get_filenames())
         c.parse_field_to_manifest(f)
 
     assert len(c.known_manifests) == 1

@@ -85,11 +85,11 @@ def cfa_resources(tmp_path, inputfield):
     for v,f in zip(fields,filenames):
         cf.write([v,],f)
 
-    f = cf.read(posix_path.glob('*.nc'))
+    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')
     cfa_file = posix_path/'test_file.nc'
     #FIXME: I don't think the substitutions are being parsed properly.
     
-    cf.write(f, cfa_file, cfa={'absolute_paths':False,
+    cf.write(f, cfa_file, cfa={'constructs': 'field','uri':'relative',
                                'substitutions':{'base':'./'}})
     fix_filenames(cfa_file)
    
