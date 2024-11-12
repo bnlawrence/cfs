@@ -83,15 +83,19 @@ def cfa_resources(tmp_path, inputfield):
 
     filenames = [posix_path/f'test_file{x}.nc' for x in range(3)]
     for v,f in zip(fields,filenames):
-        cf.write([v,],f)
+        cf.write(v, f)
 
-    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')
-    cfa_file = posix_path/'test_file.nc'
+    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')[0]
+    cfa_file = str(posix_path/'test_file.nc')
     #FIXME: I don't think the substitutions are being parsed properly.
+    print ('\n\n\nppp', str(cfa_file))
+    print (88888888888888, cf.dirname(cfa_file))
+    print(f)
+    print(f.get_filenames())
+    f.data.nc_update_aggregation_substitutions({'base': f"{posix_path}/"})
     
-    cf.write(f, cfa_file, cfa={'constructs': 'field','uri':'relative',
-                               'substitutions':{'base':'./'}})
-    fix_filenames(cfa_file)
+    cf.write(f, cfa_file, cfa={'constructs': 'field','uri':'relative'})
+#    fix_filenames(cfa_file)
    
     print('CFA setup with three files and one field')
 

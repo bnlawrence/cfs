@@ -40,16 +40,17 @@ def cfa_only(tmp_path, inputfield):
     for v,f in zip(fields,filenames):
         cf.write(v, f)
     print ('YYYYYY', list(posix_path.glob('*.nc')))
-    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')
+    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')[0]
     print(f)
-    print (f[0].get_filenames())
-    cfa_file = posix_path/'test_file.cfa'
+    f.data.nc_update_aggregation_substitutions({'base': f"{posix_path}/"})
+    
+    cfa_file = str(posix_path/'test_file.cfa')
     #FIXME: I don't think the substitutions are being parsed properly.
     cf.write(f, cfa_file, cfa={"constructs": "field", "uri": "relative"}) 
 #                               'substitutions':{'base':'./'}})
     print('CFA setup with three files and one field')
     g = cf.read(cfa_file)
-    print (g[0].get_filenames())
+    print ('g.filenames',g[0].get_filenames())
     
     return posix_path
 
