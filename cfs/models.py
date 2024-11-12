@@ -367,10 +367,9 @@ class Manifest(models.Model):
     total_size = models.PositiveBigIntegerField(null=True)
     parent_uuid = models.UUIDField(null=True)
     is_quark = models.BooleanField(default=False)
-    
 
     def delete(self,*args,**kwargs):
-        ignore = kwargs.pop('islastvar',None)
+        kwargs.pop('islastvar',None)
         if self.is_quark:
             self.fragments.delete()
         else:
@@ -382,8 +381,11 @@ class Manifest(models.Model):
 
     def __str__(self):
         fcount = self.fragment_count()
-        return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n             (first file {self.fragments.files.first()}).'
-
+        lines = [f'Manifest {self.id} for {self.cfa_file} has {fcount} fragments',
+                 f'     (First file {self.fragments.files.first()},',
+                 f'      Last file  {self.fragments.files.last()} )']
+        return '\n'.join(lines)
+       
     def fragments_as_text(self):
         """ Download a list of fragments for action"""
         fragments = self.fragments.files.all()
@@ -391,7 +393,7 @@ class Manifest(models.Model):
     
     def fragment_count(self):
         return self.fragments.files.count()
-
+    
 
 class Relationship(models.Model):
 
@@ -442,13 +444,17 @@ class TimeDomain(models.Model):
     @property
     def cfend(self):
         return cf.Data(self.ending, units=self.units, calendar=self.calendar)
-        
+
     @property
     def cfdelta(self):
         if self.interval_units=='month' and self.calendar=='360_day':
             return cf.Data(self.interval*30, units='day')
         else:
             return cf.Data(self.interval, units=self.interval_units)
+
+    @property
+    def cfrange(self):
+        return self.cfstart,self.cfend
 
     @property
     def nt(self):

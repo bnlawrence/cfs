@@ -210,23 +210,24 @@ def make_quarks(request):
     if form.is_valid():
         # Process data
         quark_name = form.cleaned_data['quark_name']
-        start_day = form.cleaned_data['start_day']
-        start_month = form.cleaned_data['start_month']
-        start_year = form.cleaned_data['start_year']
-        end_day = form.cleaned_data['end_day']
-        end_month = form.cleaned_data['end_month']
-        end_year = form.cleaned_data['end_year']
+        start_day = int(form.cleaned_data['start_day'])
+        start_month = int(form.cleaned_data['start_month'])
+        start_year = int(form.cleaned_data['start_year'])
+        end_day = int(form.cleaned_data['end_day'])
+        end_month = int(form.cleaned_data['end_month'])
+        end_year = int(form.cleaned_data['end_year'])
 
         interface=CollectionInterface()
-        try:
-            interface.make_quarks(quark_name, (start_day,start_month,start_year),
+        interface.make_quarks(quark_name, (start_day,start_month,start_year),
                              (end_day,end_month,end_year), results)
+        try:
+            pass
         except Exception as e:
             print(str(e))
-            return JsonResponse({'message': 'Invalid data', 'errors': str(e)}, status=400)
+            return JsonResponse({'message': f'Invalid data ({str(e)})', 'errors': str(e)}, status=400)
         return JsonResponse({'message': 'Quark collection created successfully!'}, status=200)
     else:
-        return JsonResponse({'message': 'Invalid data', 'errors': form.errors}, status=400)
+        return JsonResponse({'message': f'Invalid form data ({str(e)})', 'errors': form.errors}, status=400)
   
 
 @api_view(['POST'])
@@ -240,9 +241,11 @@ def add_to_collection(request):
     try:
         collection = interface.retrieve(name=collection_name)
         created=False
-    except ValueError:
+    except ObjectDoesNotExist:
         collection = interface.create(name=collection_name)
         created=True
+    except:
+        raise
     try:
         interface.add_variables(collection, results)
         count = results.count()

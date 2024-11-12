@@ -4,16 +4,17 @@ from django import template
 from django.db import transaction
 from django.db.models import Q, Count,OuterRef, Subquery
 from cfs.db.cfa_tools import get_quark_field
+from django.core.exceptions import ObjectDoesNotExist
 
 from cfs.models import (Cell_MethodSet, Cell_Method, Collection, CollectionType, 
                             Domain, File, FileSet, FileType, Location, Manifest,  
                             VariableProperty, VariablePropertyKeys, VariablePropertySet,
                             Relationship, Tag, TimeDomain, Variable)
-import io
 import cf
-import numpy as np
+from cfs.db.cfa_tools import numpy2db, db2numpy
 from time import time
 from uuid import uuid4
+
 
 import logging
 logger = logging.getLogger(__name__)
@@ -255,6 +256,14 @@ class CollectionInterface(GenericInterface):
             pass
         else:
             raise ValueError('Unknown type of collection')
+        if not force:
+            try:
+                QuarkTag = TagInterface.retrieve(name="Quark")
+                if collection.tags.filter(id=QuarkTag.id).exists():
+                    force=True
+                    logging.info(f'Delete request for {collection.name} upgraded to "force=True" as it is a Quark')
+            except ObjectDoesNotExist:
+                pass
         collection.do_empty(force)
         super().delete(collection)
 
@@ -376,26 +385,32 @@ class CollectionInterface(GenericInterface):
         :raises PermissionError: Collection already exists
         :return: None
         """
-        print(start_tuple, end_tuple, variables)
+        QuarkTag = TagInterface.get_or_create('Quark')
         quark=cls.create(name=collection_name,description="Quark")
+        quark.tags.add(QuarkTag)
         created, mcreated, tcreated = 0,0,0
-        for v in variables:
-            v,c,m,t = VariableInterface.subset(v,start_tuple, end_tuple)
-            quark.variables.add(v)
-            if c:
-                created+=1
-            if m:
-                mcreated+=1
-            if t:
-                tcreated+=1
+        nv = len(variables)
+        for i,v in enumerate(variables):
+            print(f'Working on {i}:', start_tuple, end_tuple, v.time_domain)
+            print(v, v.get_kp('atomic_origin'), v.get_kp('identifier'), v.get_kp('variant_label'))
+            try:
+                v,c,m,t = VariableInterface.subset(v,start_tuple, end_tuple)
+                quark.variables.add(v)
+                if c:
+                    created+=1
+                if m:
+                    mcreated+=1
+                if t:
+                    tcreated+=1
+            except ValueError:
+                # out of bounds error 
+                pass
+            print(f'Done var {i+1}/{nv},',c,m,t)
+            
+           
         outcome = f"Created {created} variables, {tcreated} timedomains, and {mcreated} manifests"
-        print(outcome)
-
-        #get all manifests corresponding to this set of variables
-        #make or get all the quark manifests
-        #make or get all the relevant time domains
-        #create all the new variables
-
+        logger.debug(outcome)
+        return outcome, created, tcreated, mcreated
 
 
 class DomainInterface(GenericHandler):
@@ -596,14 +611,19 @@ class ManifestInterface(GenericInterface):
     @classmethod
     def subset(cls, manifest, start_date, end_date):
         """ Make a quark subset of this particular atomic dataset manifest """
-        quark_field = get_quark_field(manifest, start_date, end_date)
+        nf = manifest.fragment_count()
+        fset = [manifest.fragments.files.all()[i] for i in [0,1,int(nf/2)-1,int(nf/2),1+int(nf/2),nf-2,nf-1]]
+        import numpy as np
+        print(f'Inputs {nf} fragments',np.shape(db2numpy(manifest.bounds)))
+        print(fset)
+        quark_field, brange = get_quark_field(manifest, start_date, end_date)
+        logging.debug(f'Subsetting manifest ({quark_field}, {brange} with {start_date},{end_date}')
         fragments = [FileInterface.retrieve(id=f) for f in quark_field.data.array.tolist()]
         tdim = quark_field.dimension_coordinate('T', default=None)
-        bounds = tdim.bounds.data.array
-        binary_stream = io.BytesIO()
-        np.save(binary_stream, bounds)
-        bounds = binary_stream.getvalue()
-        fileset, _ = FileSet.get_or_create_from_files(fragments)
+        bounds = numpy2db(tdim.bounds.data.array)
+    
+        fileset, fcreated = FileSet.get_or_create_from_files(fragments)
+        logging.debug(f'Fileset (with {len(fragments)} fragments) created?',fcreated)
         quark, created = cls.get_or_create(cfa_file=manifest.cfa_file,
                          fragments = fileset,
                          bounds = bounds,
@@ -703,6 +723,11 @@ class TagInterface(GenericInterface):
         super().create(name=name)
 
     @classmethod
+    def get_or_create(cls,name):
+        t,_ = super().get_or_create(name=name)
+        return t
+
+    @classmethod
     def _handle_tags(cls, collection, tag_or_taglist):
         if isinstance(collection,str):
             c = CollectionInterface.retrieve(name=collection)
@@ -717,7 +742,7 @@ class TagInterface(GenericInterface):
         #tags = [t[0] for t in [cls.get_or_create(x) for x in tag_or_taglist]]
         tags = []
         for x in tag_or_taglist:
-            t, created= cls.get_or_create(name=x)
+            t, created= super().get_or_create(name=x)
             if created:
                 t.save()
             tags.append(t)
@@ -769,7 +794,7 @@ class TimeInterface(GenericInterface):
         if start_date < td.starting or end_date > td.ending:
             raise ValueError('Attempt to subset timedomain is outside domain')
         values = {}
-        for arg in ['interval','interval_offset','interval_units','calendar']:
+        for arg in ['interval','units','interval_offset','interval_units','calendar']:
             values[arg]=getattr(td,arg)
         values['starting']=start_date.data.array.item()
         values['ending']=end_date.data.array.item()
@@ -784,7 +809,7 @@ class VariableProperyInterface:
     def filter_properties(cls, keylist=[], collection_ids=[], location_ids=[]):
         """ 
         Generate a subset of properties depending on whether or
-        not the properties belong to variables in a colletion, and
+        not the properties belong to variables in a collection, and
         whether or not they are stored in location.
         """
         print(keylist, collection_ids, location_ids)
@@ -986,7 +1011,8 @@ class VariableInterface(GenericInterface):
     def retrieve_by_properties(cls, properties, from_collection=None, unique=False):
         """
         Retrieve variable by arbitrary set of properties expressed as a dictionary.
-        (Basically an interface to retrieve_by_queries.)
+        (Basically an interface to retrieve_by_queries. This should retrieve 
+        the intersection!)
         """
         queries = []
 
@@ -1002,7 +1028,7 @@ class VariableInterface(GenericInterface):
                         cm = cls.cellm.retrieve(x)
                         queries.append(('cell_methods', cm))
         properties = cls._construct_properties(properties)
-        for present in ['_proxied','key_properties','cell_methods']:
+        for present in ['_proxied','key_properties','cell_methods','in_manifest']:
             if not properties[present]:
                 properties.pop(present)
         for k, v in properties.items():
@@ -1025,11 +1051,15 @@ class VariableInterface(GenericInterface):
         is created, and then a new or existing variable with the
         quark dimensions is returned.
         """
-        td = v.time_domain
+        try:
+            td = v.time_domain
+        except:
+            raise
+        print(td)
         myunits = cf.Units(td.units, calendar=td.calendar)
         start_date = cf.Data(cf.dt(start_tuple[2], start_tuple[1], start_tuple[0]), units=myunits)
         end_date = cf.Data(cf.dt(end_tuple[2], end_tuple[1], end_tuple[0]), units=myunits)
-        
+        logging.debug(f'Subsetting {v.time_domain.cfrange}')
         mf = v.in_manifest
         mf, mcreated = ManifestInterface.subset(mf, start_date, end_date)
         if mcreated:
@@ -1042,7 +1072,12 @@ class VariableInterface(GenericInterface):
             # but I think we simply need to find a variable with the same
             # manifest, as it's time domain must be the same (at least in
             # terms of bounds),
-            td = Variable.objects.filter(in_manifest=mf).first().time_domain
+            print('\nMani updating\n')
+            print(mf)
+            tdlist = Variable.objects.filter(in_manifest=mf)
+            print(tdlist)
+            print(tdlist.first())
+            td = tdlist.first().time_domain
             tcreated=False
             #my_cells = v.cell_methods
             #var1 = Variable.objects(in_manifest=mf).filter(cell_methods=my_cells).first()

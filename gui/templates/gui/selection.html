@@ -354,6 +354,7 @@
                     alert(result.message);  // Display success message
                 } else {
                     const error = await response.json();
+                    console.log(error.message);
                     alert(`Error: ${error.message}`);
                 }
             } catch (error) {

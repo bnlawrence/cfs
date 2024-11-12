@@ -280,10 +280,13 @@ def _filterview(selections):
 
 @api_view(['POST'])
 def make_quarks(request):
-
+    print('hello')
     selections = request.data.pop('selections')
+    print('0')
     results = _filterview(selections)
+    print('1')
     form = DateRangeForm(request.data)
+    print('2')
     if form.is_valid():
         # Process data
         quark_name = form.cleaned_data['quark_name']
@@ -299,11 +302,12 @@ def make_quarks(request):
             interface.make_quarks(quark_name, (start_day,start_month,start_year),
                              (end_day,end_month,end_year), results)
         except Exception as e:
-            print(str(e))
-            return JsonResponse({'message': f'Invalid data ({e})', 'errors': str(e)}, status=400)
+            print('bnl',str(e))
+            return JsonResponse({'message': f'Invalid data ({str(e)})', 'errors': str(e)}, status=400)
         return JsonResponse({'message': 'Quark collection created successfully!'}, status=200)
     else:
-        return JsonResponse({'message': f'Invalid data ({e})', 'errors': form.errors}, status=400)
+        print('form issue')
+        return JsonResponse({'message': f'Invalid data ({(str(e))}', 'errors': form.errors}, status=400)
   
 
 @api_view(['POST'])

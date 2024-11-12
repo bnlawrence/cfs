@@ -7,6 +7,7 @@ import hashlib
 import logging
 import cf
 
+
 logger = logging.getLogger(__name__)
 logger.setLevel('WARN')
 
@@ -18,6 +19,29 @@ def bounds_range(bounds_array):
     print('Bounds range ',x,y)
     return x[:,0],y[:,-1]
 
+def numpy2db(an_array):
+    """
+    Take a numpy array and serialise it for storage in a database
+    :param an_array: Numpy array
+    :type an_array: np.array type
+    :returns: binary blob for storage in database
+    """
+    binary_stream = io.BytesIO()
+    np.save(binary_stream, an_array)
+    result = binary_stream.getvalue()
+    return result
+
+def db2numpy(blob):
+    """
+    Take a binary blob stored in the database and return it to a numpy array
+    :param blob: blob of data
+    :type blob: sequence of bytes produced by numpy2db
+    :returns: a numpy array
+    """
+    binary_stream = io.BytesIO(blob)
+    binary_stream.seek(0)
+    nparray = np.load(binary_stream)
+    return nparray
 
 def consistent_hash(mylist):
     """ 
@@ -54,9 +78,7 @@ def get_quark_field(instance, start_date, end_date):
     T_axis= fld.set_construct(cf.DomainAxis(fragments.size))
     fld.set_data(fragments, axes=T_axis)
 
-    binary_stream = io.BytesIO(instance.bounds)
-    binary_stream.seek(0)
-    bounds = np.load(binary_stream)
+    bounds = db2numpy(instance.bounds)
    
     timedata = np.mean(bounds, axis=1)
     
@@ -69,22 +91,26 @@ def get_quark_field(instance, start_date, end_date):
     if start_date < left or end_date > right:
         raise ValueError(f'Cannot find a quark manifest: Dates {start_date},{end_date} not within {left}{right}')
     
-    fld.set_construct(dimT, axes=T_axis)
     nf, nt = len(fragments), len(timedata)
+    logging.debug(f'Creating time dimension for {nf} fragments with {nt} time entries')
+
     if nf != nt:
+      
         raise RuntimeError(
-            'Number of of manifest fragments ({nf}) not equal to time data length ({nt}).')
+            f'Number of of manifest fragments ({nf}) not equal to time data length ({nt}).')
+   
+    fld.set_construct(dimT, axes=T_axis)
     print('Subspacing using cellwi to ',start_date, end_date)
 
     quark = fld.subspace(time=cf_cells_overlap(start_date, end_date))
     dimT = quark.dimension_coordinate('T')
-    bounds_range(dimT.bounds)
-    return quark
+    return quark, bounds_range(dimT.bounds)
+
 
 
 class CFAManifest:
     """ 
-    Used to work with manifests, inside and outside of the database
+    Used to work with manifests, outside of the database
     """
     # cfa fragment files are held as dictionary items with keys
     fragment_template = {'name':None,'path':None,'size':None,'type':'F'}
@@ -138,10 +164,7 @@ class CFAManifest:
         self.units = units
         self.calendar = calendar
         self._bounds_ncvar = ncvar
-
-        binary_stream = io.BytesIO()
-        np.save(binary_stream, bounds)
-        self.bounds = binary_stream.getvalue()
+        self.bounds = numpy2db(bounds)
 
 
     @classmethod
@@ -214,7 +237,7 @@ class CFAhandler:
             tdimvar = None
 
         #have we seen this before?
-        manikey =consistent_hash(filenames)
+        manikey = consistent_hash(filenames)
         if manikey in self.known_manifests:
             # maybe, the filenames match
             candidate_manifest = self.known_manifests[manikey]

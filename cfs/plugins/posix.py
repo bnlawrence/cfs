@@ -84,11 +84,12 @@ class Posix:
 
         if regex is None:
             regex = '*.nc'
-        cfa = regex == '*.cfa'
 
-        if regex not in ['*.nc','*.cfa']:
-            raise NotImplementedError
+        pr = Path(regex)
+        cfa = pr.suffix=='.cfa'
 
+        logger.info(f'Posix upload using {regex} is a CFA upload {cfa}')
+        print(pr.suffix)
 
         # record details of how collection was established as collection properties
         for k,v in zip(keys,args):
