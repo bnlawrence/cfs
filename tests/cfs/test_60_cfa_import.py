@@ -7,7 +7,7 @@ import os
 from cfs.db.standalone import setup_django
 
 
-VARIABLE_LIST = ['specific_humidity',]
+VARIABLE_LIST = ['air_potential_temperature']
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_db(tmp_path_factory, request):
@@ -59,7 +59,24 @@ def cfa_resources(tmp_path, inputfield):
 
     posix_path = tmp_path / 'posix_root'  
     posix_path.mkdir(exist_ok=True)  
+
+    filenames = [posix_path/f'test_file{x}.nc' for x in range(3)]
+    print(inputfield)
+    for f, index in zip(filenames, range(0, 36, 12)):
+        print(index, f )
+        cf.write(inputfield[index:index+12], f)
+                                     
+    print ('ZZZZZZ', list(posix_path.glob('*.nc')))
+    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')[0]
+    print(f)
+#    f.data.nc_update_aggregation_substitutions({'base': f"{posix_path}/"})
     
+    cfa_file = str(posix_path/'test_file.cfa')
+
+    cf.write(f, cfa_file, cfa={"constructs": "field", "uri": "relative"}) 
+
+    return posix_path
+
     f1 = inputfield
     f2 = f1.copy()
     f3 = f1.copy()
@@ -92,7 +109,7 @@ def cfa_resources(tmp_path, inputfield):
     print (88888888888888, cf.dirname(cfa_file))
     print(f)
     print(f.get_filenames())
-    f.data.nc_update_aggregation_substitutions({'base': f"{posix_path}/"})
+#    f.data.nc_update_aggregation_substitutions({'base': f"{posix_path}/"})
     
     cf.write(f, cfa_file, cfa={'constructs': 'field','uri':'relative'})
 #    fix_filenames(cfa_file)
@@ -118,7 +135,8 @@ def test_cfa_view(django_dependencies, cfa_resources):
         intent='C'
         )
     c1 = test_db.collection.retrieve(name='posix_cfa_example')
-    assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
+    assert set([x.get_kp('standard_name')
+                for x in c1.variables.all()]) == set(VARIABLE_LIST)
 
 
 def test_fragments(django_dependencies):

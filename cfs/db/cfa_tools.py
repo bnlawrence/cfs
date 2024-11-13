@@ -145,6 +145,8 @@ class CFAhandler:
         else:
             tdimvar = None
 
+        calendar = getattr(tdim, 'calendar', 'standard')
+            
         #have we seen this before?
         manikey =consistent_hash(filenames)
         if manikey in self.known_manifests:
@@ -160,7 +162,7 @@ class CFAhandler:
                 new_manifest = CFAManifest.from_dbdict(candidate_manifest)
                 if tdimvar is not None:
                     bounds = self._parse_bounds_from_field(field, tdim)
-                    new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
+                    new_manifest.add_bounds(bounds, tdim.units, calendar, tdimvar)
                    
                 # th other option is that we've got no bounds, the boundless manifest is what we want.
                 return self._add_known_and_exit(new_manifest,field)
@@ -171,7 +173,7 @@ class CFAhandler:
             new_manifest.add_fragment(f)
         if tdim is not None:
             bounds = self._parse_bounds_from_field(field, tdim)
-            new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
+            new_manifest.add_bounds(bounds, tdim.units, calendar, tdimvar)
         return self._add_known_and_exit(new_manifest, field)
 
     def _add_known_and_exit(self, manifest, field):

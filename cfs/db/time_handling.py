@@ -275,8 +275,15 @@ class LookupT:
         else:
             interval, interval_units, interval_offset = self.inferred[ncvar]
 
-        return {'interval':interval, 'interval_units':interval_units,'interval_offset':interval_offset,
-                'starting':bounds[0], 'ending': bounds[1], 'units':tdim.units, 'calendar':tdim.calendar}
+        return {
+            'interval': interval,
+            'interval_units': interval_units,
+            'interval_offset': interval_offset,
+            'starting': bounds[0],
+            'ending': bounds[1],
+            'units': tdim.units,
+            'calendar': getattr(tdim, "calendar", 'standard')
+        }
     
     def infer_temporal_resolution(self,tdim, delta):
         """
