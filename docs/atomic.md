@@ -11,7 +11,7 @@ An atomic datset may be present in several different locations (or not yet even 
 
 We talk about these partial atomic datasets as quark datasets. The most likely way we encounter those is via incomplete atomic datasets, or as part of an atomic dataset which has been migrated to disk. 
 
-These notions are important, because they give us the language to think about our workflow in detail, and to manage the necessary information in a database, in our case "CFStore".
+These notions are important, because they give us the language to think about our workflow in detail, and to manage the necessary information in a database, in our case "CFStore".16 
 
 CFStore represents all of these concepts using pieces that can be re-used between atomic-datasets, which is what the "aggregation" (hollow diamonds) rather than "composition" (filled diamonds) notation means in the figure above.
 

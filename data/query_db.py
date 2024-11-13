@@ -1,6 +1,7 @@
 from pathlib import Path
 here = Path(__file__).parent.resolve()
 import os
+os.environ['CFS_DBDIR']=str(here)
 from django import setup
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.settings')
 setup()
@@ -23,6 +24,4 @@ vars3 = db.variable.retrieve_by_properties({'standard_name':'eastward_wind',
 
 print(len(vars0), len(vars1), len(vars2), len(vars3))
 
-assert len(vars3) == 4
-
-print(vars)
+assert len(vars3) == 6

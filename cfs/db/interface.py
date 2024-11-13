@@ -261,7 +261,7 @@ class CollectionInterface(GenericInterface):
                 QuarkTag = TagInterface.retrieve(name="Quark")
                 if collection.tags.filter(id=QuarkTag.id).exists():
                     force=True
-                    logging.info(f'Delete request for {collection.name} upgraded to "force=True" as it is a Quark')
+                    logger.info(f'Delete request for {collection.name} upgraded to "force=True" as it is a Quark')
             except ObjectDoesNotExist:
                 pass
         collection.do_empty(force)
@@ -390,6 +390,10 @@ class CollectionInterface(GenericInterface):
         quark.tags.add(QuarkTag)
         created, mcreated, tcreated = 0,0,0
         nv = len(variables)
+        mf = ManifestInterface.all()
+        for m in mf:
+            print(m.id, m.fragment_count())
+
         for i,v in enumerate(variables):
             print(f'Working on {i}:', start_tuple, end_tuple, v.time_domain)
             print(v, v.get_kp('atomic_origin'), v.get_kp('identifier'), v.get_kp('variant_label'))
@@ -617,13 +621,13 @@ class ManifestInterface(GenericInterface):
         print(f'Inputs {nf} fragments',np.shape(db2numpy(manifest.bounds)))
         print(fset)
         quark_field, brange = get_quark_field(manifest, start_date, end_date)
-        logging.debug(f'Subsetting manifest ({quark_field}, {brange} with {start_date},{end_date}')
+        logger.debug(f'Subsetting manifest ({quark_field}, {brange} with {start_date},{end_date}')
         fragments = [FileInterface.retrieve(id=f) for f in quark_field.data.array.tolist()]
         tdim = quark_field.dimension_coordinate('T', default=None)
         bounds = numpy2db(tdim.bounds.data.array)
     
         fileset, fcreated = FileSet.get_or_create_from_files(fragments)
-        logging.debug(f'Fileset (with {len(fragments)} fragments) created?',fcreated)
+        logger.debug(f'Fileset (with {len(fragments)} fragments) created? {fcreated}')
         quark, created = cls.get_or_create(cfa_file=manifest.cfa_file,
                          fragments = fileset,
                          bounds = bounds,
@@ -928,7 +932,8 @@ class VariableInterface(GenericInterface):
         for key,value in queries:
             #print('Query step', key, value)
             if key == 'key_properties':
-                base = base.filter(key_properties__properties__in=value)
+                for p in value:
+                    base = base.filter(key_properties__properties=p)
             elif key in ["spatial_domain","temporal_domain"]:
                 base = base.filter(**{key:value})
             elif key == 'in_file':
@@ -1059,7 +1064,7 @@ class VariableInterface(GenericInterface):
         myunits = cf.Units(td.units, calendar=td.calendar)
         start_date = cf.Data(cf.dt(start_tuple[2], start_tuple[1], start_tuple[0]), units=myunits)
         end_date = cf.Data(cf.dt(end_tuple[2], end_tuple[1], end_tuple[0]), units=myunits)
-        logging.debug(f'Subsetting {v.time_domain.cfrange}')
+        logger.debug(f'Subsetting {v.time_domain.cfrange}')
         mf = v.in_manifest
         mf, mcreated = ManifestInterface.subset(mf, start_date, end_date)
         if mcreated:

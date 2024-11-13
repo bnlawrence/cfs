@@ -71,7 +71,7 @@ def cfupload_ncfiles(db, location_name, base_collection, dbfiles, intent, cfa=Fa
         fd['location']=loc
         logger.info(f'Handling {fd}')
         xt1 = time()
-        fields = cf.read(fd['path'])
+        fields = cf.read(fd['path'], aggregate=False)
         xt2 = time()
         if fixer is not None:
             for f in fields:
