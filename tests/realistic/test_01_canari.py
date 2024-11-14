@@ -93,10 +93,12 @@ def test_retrieve_by_properties(django_dependencies):
     print([(v.get_kp('standard_name'),v.get_kp('frequency')) for v in vars2])
     print([(v.get_kp('standard_name'),v.get_kp('frequency')) for v in vars3])
 
-
+    for v in vars0:
+        print(v.get_kp('frequency'))
+    # This test can't work right now because the input data doesn't have
+    # frequencies. I don't know why not.
     print(len0, len1, len2, len3)
 
-    print (1/0)
 
 def test_canari_time_domains(django_dependencies):
 
