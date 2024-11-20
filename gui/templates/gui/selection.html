@@ -54,6 +54,24 @@
                 <div id="summary-content"></div>
                 </div>
             </div>
+            <div id="quark-area" class="rightblock">
+                <div class="block-container">
+                <h4> Create Quark(s) </h4>
+                <form id="quarkForm">
+                    {% csrf_token %}
+                    <div class="form-group">
+                        <!-- Include statements have to be one online -->
+                        {% include "gui/date_field.html" with legend="Start" day_id="day1" day=form.start_day month_id="mon1" month=form.start_month year_id="yr1" year=form.start_year  %}
+                        {% include "gui/date_field.html" with legend="End" day_id="day2" day=form.end_day month_id="mon2" month=form.end_month year_id="yr2" year=form.end_year  %}
+                        
+                    </br>
+                        <label for="inputTextQ">Quark Collection Name:</label>
+                        {{form.quark_name}}
+                    </div>
+                    <button type="submit">Create</button>
+                </form>
+            </div>
+            </div>
             <div id="action-area" class="rightblock">
                 <div class="block-container">
                     <h4>Add to Collection</h4>
@@ -290,6 +308,7 @@
         document.getElementById('viewButton').addEventListener('click', sendSelectedValues);
 
         // Add event listeners for the forms
+
         const addCollectionForm = document.getElementById("addCollectionForm");
         addCollectionForm.addEventListener("submit", async function(event) {
                 const collectionName = document.getElementById("inputTextC").value;
@@ -298,10 +317,51 @@
                 console.log('MADE IT')
                 await populateDropdown('dd-col', '/api/entity-select?entity=collection');
             });
-        const downloadManifestForm = document.getElementById("downloadManifestForm");
-        downloadManifestForm.addEventListener("submit", function(event) {
-            const manifestFilename = document.getElementById("inputTextM").value;
-            handleFormSubmit(event, '/api/download-manifest/', { manifest_filename: manifestFilename });
+        
+        //const downloadManifestForm = document.getElementById("downloadManifestForm");
+        //downloadManifestForm.addEventListener("submit", function(event) {
+        //    const manifestFilename = document.getElementById("inputTextM").value;
+        //    handleFormSubmit(event, '/api/download-manifest/', { manifest_filename: manifestFilename });
+        //});
+        
+        const quarkForm = document.getElementById("quarkForm");
+        quarkForm.addEventListener("submit", async function(event) {
+            event.preventDefault();
+            console.log('Quarking');
+            const selectedValues = getSelectedValues(); 
+            const data = {
+                start_day: document.getElementById('day1').value,
+                start_month: document.getElementById('mon1').value,
+                start_year: document.getElementById('yr1').value,
+                end_day: document.getElementById('day2').value,
+                end_month: document.getElementById('mon2').value,
+                end_year: document.getElementById('yr2').value,
+                quark_name: document.getElementById('inputTextQ').value,
+                selections: selectedValues
+            };
+            try {
+                const response = await fetch('/api/make-quarks/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie()
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    alert(result.message);  // Display success message
+                } else {
+                    const error = await response.json();
+                    console.log(error.message);
+                    alert(`Error: ${error.message}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('There was a problem with your submission.');
+            }
+
         });
 
         function getButtonId() {

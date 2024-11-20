@@ -64,9 +64,10 @@ def test_infer_timing():
 
 def test_domain(inputfield):
     
-    print(inputfield)
+    print('TEST_DOMAIN:\n',inputfield)
     d = extract_cfsdomain(inputfield)
     assert d['name'] == 'test'
+    assert d['size'] == 40
 
 def test_atomic_name(inputfield):
 

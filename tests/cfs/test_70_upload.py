@@ -97,12 +97,12 @@ def test_posix_class_nested(django_dependencies, posix_nest):
     assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
     assert len(test_db.relationship.retrieve('posix_test_collection2','parent_of')) == 1
     c2 = test_db.collection.retrieve(name='posix_test_collection2/subset1')
-    print('C2\n',c2.variables.all(),'**')
     assert c1.variables.count() == 3
     assert c2.variables.count() == 2
     rout = test_db.relationship.retrieve('posix_test_collection2').count()
     rin = test_db.relationship.retrieve('posix_test_collection2',outbound=False).count()
     assert rout+rin == 2
+
 
 def test_deleting_collections(django_dependencies):
     """
@@ -117,6 +117,7 @@ def test_deleting_collections(django_dependencies):
     assert removed == 2
     remaining = test_db.collection.count()
     assert remaining == n_collections-2
+
 
 def test_cleanup(django_dependencies):
     """ 

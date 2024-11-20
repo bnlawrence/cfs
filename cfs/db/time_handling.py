@@ -7,6 +7,10 @@ logger = logging.getLogger(__name__)
 logger.setLevel('DEBUG')
 
 
+
+
+
+
 def get_tm(field):
     """ For the given field, get the time cell method, if any, as a string """
     # FIXME strictly, the name of a dimension might not include time, so

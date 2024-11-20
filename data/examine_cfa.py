@@ -10,7 +10,9 @@ egfile = here/file
 
 fields = cf.read(egfile)
 
-hfields = [f for f in fields if getattr(f,'standard_name',None) == 'specific_humidity']
+
+#hfields = [f for f in fields if getattr(f,'standard_name',None) == 'specific_humidity']
+hfields = fields.select('specific_humidity')
 
 for h in hfields:
     print(h)

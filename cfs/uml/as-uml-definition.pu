@@ -1,0 +1,121 @@
+@startuml
+
+skinparam classfontstyle bold
+skinparam classbackgroundcolor White
+skinparam classbordercolor Black
+skinparam arrowcolor black
+skinparam ranksep 40
+skinparam NoteBackgroundColor White
+skinparam NoteBorderColor Black
+skinparam classfontsize 14
+skinparam notetextalignment center
+skinparam ClassBackgroundColor mintcream 
+skinparam classheaderbackgroundcolor slategrey 
+
+skinparam classattributeiconsize 0
+skinparam classfontcolor white
+skinparam classstereotypefontcolor white
+skinparam notebackgroundcolor white
+
+skinparam notebackgroundcolor white
+
+hide empty methods
+hide empty attributes
+hide circle
+
+'Need the {field} notation to override interpretation as method when brackets present
+
+class "Aggregation File" as AgFile <<File>> {
+    + {field} Coordinates for Aggregated Domain (A-Metadata)
+    + {field}Common (B-) metadata from atomic datasets.
+}
+
+frame "CF World"  {
+
+    class Field <<CF-Concept>> {
+        +CF-Domain
+        +Variable
+    }
+    class Data <<abstract >> {
+        Not in DB 
+        obviously
+    }
+
+    class Domain <<CF-Concept>> {
+        Not in DB
+    }
+
+    class "Properties" as BM  { 
+        + {field} Science (B) Properties
+        (Represented in DB)
+    }
+
+}
+    class TimeDomain <<DB-Concept>> {
+        + Bounds
+        + Calendar, Units
+        + Sampling Interval
+        {field} +Sampling Type (time cell method)
+    } 
+
+
+    class SpatialDomain <<DB-Concept>> {
+        + Name 
+        + x,y,z dimensions
+        + Spatial Cell Methods
+    }
+
+
+
+
+
+
+class "Aggregation File" as AgFile <<File>> {
+    + {field} Coordinates for Aggregated Domain (A-Metadata)
+    + {field}Common (B-) metadata from atomic datasets.
+}
+
+
+class "Atomic Dataset" as atomic <<concept>> {
+    + Coordinate metadata spans fragments
+    + Includes B-metadata common to fragments
+}
+class "Quark Dataset" as quark <<concept>> {
+    + Hyperslab across one or more dimensions
+    + All fragments resident on
+one storage element or needed
+in memory to resolve a calculation.
+}
+
+class "Fragment" as file <<File>> {
+    + Resident on one or more storage systems
+    + Includes data and normal science metadata
+}
+
+class Variable <<DB-Concept>> {
+    Representation of a field
+}
+
+
+AgFile o--> [1..N] file: points to
+AgFile --> [1..N] atomic: contains
+
+atomic -> Field: stores a
+Field *--> Data
+Field o--> BM
+Field *--> Domain
+Domain o--> TimeDomain
+Domain o--> SpatialDomain
+
+atomic  o--> [N] file: "may be\nmultiple\nreplicas"
+
+atomic <|-- quark
+
+quark o--> [m <= n] file
+
+Variable ..> Field
+
+AgFile .> [1..V] Variable: contains
+
+
+@enduml

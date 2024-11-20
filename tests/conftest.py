@@ -19,7 +19,6 @@ def inputfield():
     """ 
     Create a field to use for testing. This is nearly straight from the CF documentation.
     """
-
     f = cf.example_field(2)
     f.set_properties({'project': 'testing', 'institution':'NCAS'})
     f.set_construct(cf.CellMethod(axes=f.domain_axis('T', key=True), method='maximum'))
@@ -95,6 +94,3 @@ def inputfield():
 #    Q.set_construct(dimX)
 #
 #    return Q
-
-
-

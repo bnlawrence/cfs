@@ -83,6 +83,8 @@ def extract_cfsdomain(field, lookup_xy=LookupXY):
     : returns : A dictionary of domain properties for the field provided.
     """
     # I don't think we'd have data files without Y would we?
+    print('rrrrrrrrrrrrrrrrrrrrrr')
+    print(field)
     try:
         ydim = field.dimension_coordinate('Y').size
     except ValueError:

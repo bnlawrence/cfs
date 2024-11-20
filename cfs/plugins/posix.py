@@ -1,4 +1,5 @@
 from cfs.db.file_handling import cfupload_ncfiles
+from django.core.exceptions import ObjectDoesNotExist
 from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
@@ -22,7 +23,7 @@ class Posix:
         try:
             loc = self.db.location.retrieve(location)
             logger.info(f"Using existing location ({loc})")
-        except ValueError:
+        except ObjectDoesNotExist:
             loc = self.db.location.create(location)
             logger.info(f"Using new location ({loc})")
 
@@ -65,7 +66,7 @@ class Posix:
             self.db.collection.add_type(c,'_type',intent)
 
         args = [
-            path_to_collection_head,
+            str(path_to_collection_head),
             collection_name,
             collection_description,
             subcollections,
@@ -83,11 +84,12 @@ class Posix:
 
         if regex is None:
             regex = '*.nc'
-        cfa = regex == '*.cfa'
 
-        if regex not in ['*.nc','*.cfa']:
-            raise NotImplementedError
+        pr = Path(regex)
+        cfa = pr.suffix=='.cfa'
 
+        logger.info(f'Posix upload using {regex} is a CFA upload {cfa}')
+        print(pr.suffix)
 
         # record details of how collection was established as collection properties
         for k,v in zip(keys,args):
@@ -114,7 +116,7 @@ class Posix:
             for sc in collections:
                 try:
                     cc = self.db.collection.retrieve(name=str(sc))
-                except ValueError:
+                except ObjectDoesNotExist:
                     cc = self.db.collection.create(name=str(sc), description="Subdirectory of collection {c}")
                     pd = str(Path(sc).parent)
                     #print(f'Created {cc} with parent {pd}')

@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 from cfs.db.standalone import setup_django
-
+from django.core.exceptions import ObjectDoesNotExist
 
 VARIABLE_LIST = ['air_potential_temperature']
 
@@ -82,10 +82,10 @@ def cfa_resources(tmp_path, inputfield):
     f3 = f1.copy()
 
     # there will be a more elegant way of doing this, but this is fine for now
-    new_dates1 = np.array([105,135,165])
-    new_bounds1 = np.array([[91,120],[121,150],[151,180]])
-    new_dates2 = new_dates1 + 90
-    new_bounds2 = new_bounds1 + 90
+    new_dates1 = np.array([135,165,195,225])
+    new_bounds1 = np.array([[121,150],[151,180],[181,210],[211,240]])
+    new_dates2 = new_dates1 + 120
+    new_bounds2 = new_bounds1 + 120
 
     for nd, nb, f in zip([new_dates1,new_dates2], [new_bounds1, new_bounds2],[f2,f3]):
         dimT = cf.DimensionCoordinate(
@@ -161,7 +161,7 @@ def test_manifest(django_dependencies):
     manifests = test_db.manifest.all()
     assert test_db.manifest.count() == 1
 
-    assert manifests[0].fragments.count() == 3
+    assert manifests[0].fragment_count() == 3
 
 
 def test_variable(django_dependencies):
@@ -175,6 +175,50 @@ def test_variable(django_dependencies):
     assert v.in_file == f
     m = test_db.manifest.all()[0]
     assert v.in_manifest == m
+
+def test_tdquarking(django_dependencies):
+    test_db, ignore, ignore = django_dependencies
+    v = test_db.variable.all()[0]
+    td = v.time_domain
+    print ('td=', td)
+    myunits = cf.Units(td.units, calendar=td.calendar)
+#    start_date = cf.Data(cf.dt(2019, 2, 15), units=myunits)
+#    end_date = cf.Data(cf.dt(2019, 11, 15), units=myunits)
+    start_date = cf.Data(cf.dt(1961, 2, 15), units=myunits)
+    end_date = cf.Data(cf.dt(1961, 11, 15), units=myunits)
+    from cfs.db.interface import TimeInterface
+    td, tcreated = TimeInterface.subset(td, start_date, end_date)
+    assert tcreated is True
+
+
+def test_quarks(django_dependencies):
+    test_db, ignore, ignore = django_dependencies
+    v = test_db.variable.all()[0]
+    m = v.in_manifest
+    td = v.time_domain
+    s = td.cfstart
+    e = td.cfend
+    tdunits= cf.Units(td.units,calendar=td.calendar)
+    
+    #first test something that should just return the original atomic dataset, no quark
+    newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,12, 1959), (15,11,1962))
+    print('newv, created, mcreated, tcreated',  newv, created, mcreated, tcreated )
+    assert tcreated == mcreated == created == False
+    assert newv == v
+
+    #now do a test which really will get a different result
+    newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,5,1960), (15,9,1961))
+    assert tcreated == mcreated == created == True
+    assert newv.in_manifest.fragment_count() == 2
+    assert newv != v
+    newv.delete()
+
+    #now do a test which should raise an error
+    with pytest.raises(ValueError) as context:
+        newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,5,2019), (15,9,2020))
+ 
+    
+    
     
 
 
@@ -199,7 +243,7 @@ def test_deletion(django_dependencies):
     #ok now test that deleting it with force, does remove the variable, files, and fragments.
     collection.delete(force=True)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(ObjectDoesNotExist):
         test_db.collection.retrieve(name='posix_cfa_example')
 
     n_all_variables = test_db.variable.count()

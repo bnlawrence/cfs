@@ -1,7 +1,9 @@
 from cfs.db.standalone import setup_django
+from django.core.exceptions import ObjectDoesNotExist
 from pathlib import Path
 from cfdm import cellmethod
 from django.db import connection
+import cf
 
 import pytest
 
@@ -49,6 +51,18 @@ def test_data():
     col = cdb.collection.create(name='Holding')
     file = cdb.file.create(FILE_PROPERTIES)
     return cdb, file, col
+
+def test_time_domain_subset(test_data):
+    test_db, _, _ = test_data
+    td = test_db.tdomain.create(**STD_TEMPORAL)
+    units = cf.Units(td.units, calendar=td.calendar)
+    start_date = cf.Data(cf.dt(2019,3,1),units=units)
+    end_date =  cf.Data(cf.dt(2019,6,1),units=units)
+    tds, created = test_db.tdomain.subset(td, start_date, end_date)
+    assert created is True
+    assert td.units == tds.units
+    test_db.tdomain.delete(tds)
+    
 
 def test_simple_variable(test_data):
     test_db, file, col = test_data
@@ -286,7 +300,7 @@ def test_collection_empty_4_delete(test_data):
         test_db.collection.delete(c)
     vars = test_db.variable.retrieve_in_collection(cname)
     test_db.collection.delete(c, force=True)
-    with pytest.raises(ValueError):
+    with pytest.raises(ObjectDoesNotExist):
         test_db.collection.retrieve(name=cname)
 
 

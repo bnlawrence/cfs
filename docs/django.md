@@ -5,7 +5,7 @@ There needs to be an environment variable CFS_DBDIR which points to a location w
 To get going we need the usual django setup stuff:    
 
 ```bash
-python manage.py makemigrations core
+python manage.py makemigrations cfs
 python manage.py migrate
 python manage.py createsuperuser
 ```

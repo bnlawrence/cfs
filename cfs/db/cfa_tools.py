@@ -1,11 +1,47 @@
 from pathlib import Path
 import h5netcdf as h5
 import numpy as np
-import uuid
+import uuid, io
 from time import time
 import hashlib
 import logging
+import cf
+
+
 logger = logging.getLogger(__name__)
+logger.setLevel('WARN')
+
+def bounds_range(bounds_array):
+    """ Convenience tool for looking at the bounds
+    of a cf field"""
+    x = bounds_array.data[0]
+    y = bounds_array.data[-1]
+    print('Bounds range ',x,y)
+    return x[:,0],y[:,-1]
+
+def numpy2db(an_array):
+    """
+    Take a numpy array and serialise it for storage in a database
+    :param an_array: Numpy array
+    :type an_array: np.array type
+    :returns: binary blob for storage in database
+    """
+    binary_stream = io.BytesIO()
+    np.save(binary_stream, an_array)
+    result = binary_stream.getvalue()
+    return result
+
+def db2numpy(blob):
+    """
+    Take a binary blob stored in the database and return it to a numpy array
+    :param blob: blob of data
+    :type blob: sequence of bytes produced by numpy2db
+    :returns: a numpy array
+    """
+    binary_stream = io.BytesIO(blob)
+    binary_stream.seek(0)
+    nparray = np.load(binary_stream)
+    return nparray
 
 def consistent_hash(mylist):
     """ 
@@ -17,10 +53,65 @@ def consistent_hash(mylist):
     data = str(tuple_list).encode('utf-8')
     return hashlib.md5(data).hexdigest()
 
+def cf_cells_overlap(value0, value1, units=None):
+    """ Will be in next CF release"""
+    #FIXME: When in general release, remove 
+    return cf.Query("ge", value0, units=units, attr="upper_bounds") & cf.Query(
+        "le", value1, units=units, attr="lower_bounds"
+    )
+
+def get_quark_field(instance, start_date, end_date):
+    """ Given a CFS manifest field (i.e. an instance of the Manifest class 
+    found in the django models.py) and a pair of bounding dates, return
+    a CF field instance with the information needed to construct a 
+    subspace manifest.
+    : instance : A CFS manifest instance
+    : start_date : A date in a cf.Data instance
+    : end_date : A date in a cf.Data instance.
+    : output : A CF field instance with the correct bounds, and 
+    a set of fragment ids in the field data.
+    """
+
+    fld = cf.Field(properties={'long_name':'fragments'})
+    
+    fragments = np.array([f.id for f in instance.fragments.files.all()])
+    T_axis= fld.set_construct(cf.DomainAxis(fragments.size))
+    fld.set_data(fragments, axes=T_axis)
+
+    bounds = db2numpy(instance.bounds)
+   
+    timedata = np.mean(bounds, axis=1)
+    
+    dimT = cf.DimensionCoordinate(properties={'standard_name':'time',
+                    'units':cf.Units(instance.units,calendar=instance.calendar)},
+                data = timedata,
+                bounds = cf.Bounds(data=bounds)
+                )
+    left, right = bounds_range(dimT.bounds)
+    if start_date < left or end_date > right:
+        raise ValueError(f'Cannot find a quark manifest: Dates {start_date},{end_date} not within {left}{right}')
+    
+    nf, nt = len(fragments), len(timedata)
+    logging.debug(f'Creating time dimension for {nf} fragments with {nt} time entries')
+
+    if nf != nt:
+      
+        raise RuntimeError(
+            f'Number of of manifest fragments ({nf}) not equal to time data length ({nt}).')
+   
+    fld.set_construct(dimT, axes=T_axis)
+    print('Subspacing using cellwi to ',start_date, end_date)
+
+    print(fld.dump())
+    quark = fld.subspace(time=cf_cells_overlap(start_date, end_date))
+    dimT = quark.dimension_coordinate('T')
+    return quark, bounds_range(dimT.bounds)
+
+
 
 class CFAManifest:
     """ 
-    Used to work with manifests, inside and outside of the database
+    Used to work with manifests, outside of the database
     """
     # cfa fragment files are held as dictionary items with keys
     fragment_template = {'name':None,'path':None,'size':None,'type':'F'}
@@ -73,8 +164,9 @@ class CFAManifest:
         """
         self.units = units
         self.calendar = calendar
-        self.bounds = bounds
         self._bounds_ncvar = ncvar
+        self.bounds = numpy2db(bounds)
+
 
     @classmethod
     def from_dbdict(cls, dbdict):
@@ -148,7 +240,7 @@ class CFAhandler:
         calendar = getattr(tdim, 'calendar', 'standard')
             
         #have we seen this before?
-        manikey =consistent_hash(filenames)
+        manikey = consistent_hash(filenames)
         if manikey in self.known_manifests:
             # maybe, the filenames match
             candidate_manifest = self.known_manifests[manikey]
@@ -218,7 +310,7 @@ class CFAhandler:
         print (ncv)
         aggregated_data = ncv.attrs['aggregated_data']
         parsed_aggregated_data = dict(zip(aggregated_data.split()[::2], aggregated_data.split()[1::2]))
-        location = parsed_aggregated_data['shape:']
+        location = parsed_aggregated_data['map:']
         #FIXME: this assumes time is the first dimension 
         location = self.dataset.variables[location][:][0]
         return location

@@ -68,6 +68,14 @@ cfs.File o--o cfs.Location
 cfs.File .- cfs.File_type
 
 
+class cfs.FileSet #d6f4dc {
+    + id (BigAutoField)
+    + key (CharField)
+    # files (ManyToManyField)
+}
+cfs.FileSet o--o cfs.File
+
+
 class cfs.Location #d6f4dc {
     - id (AutoField)
     + name (CharField)
@@ -78,15 +86,16 @@ class cfs.Location #d6f4dc {
 class cfs.Manifest #d6f4dc {
     - id (AutoField)
     ~ cfa_file (ForeignKey)
+    ~ fragments (ForeignKey)
     + bounds (BinaryField)
     + units (CharField)
     + calendar (CharField)
     + total_size (PositiveBigIntegerField)
     + parent_uuid (UUIDField)
-    # fragments (ManyToManyField)
+    + is_quark (BooleanField)
 }
 cfs.Manifest <--* cfs.File
-cfs.Manifest o--o cfs.File
+cfs.Manifest <--* cfs.FileSet
 
 
 class cfs.Relationship #d6f4dc {

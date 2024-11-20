@@ -7,6 +7,7 @@ from pathlib import Path
 import logging
 logger = logging.getLogger(__name__)
 import cf
+import math
 
 
 from django.dispatch import receiver
@@ -300,6 +301,35 @@ class File(models.Model):
         super().delete(*args,**kwargs)
 
 
+class FileSet(models.Model):
+    """ 
+    Provides a single view of a set of files, e.g. associated with
+    a manifest. We need this to simplify concepts of uniqueness, and 
+    improve performance in filtering.
+    """
+    files = models.ManyToManyField(File)
+    key = models.CharField(max_length=64, unique=True)
+
+    def __str__(self):
+        return ','.join([str(f) for f in self.files.all()])
+
+    @staticmethod
+    def generate_key(files):
+        """Generate a unique key (e.g., hash) for a list of property ids."""
+        file_ids = sorted([str(f.id) for f in files])
+        key_string = ",".join(file_ids)
+        return hashlib.md5(key_string.encode('utf-8')).hexdigest()
+
+    @classmethod
+    def get_or_create_from_files(cls, files):
+        """Retrieve or create a FileSet based on the list of files."""
+        key = cls.generate_key(files)
+        file_set, created = cls.objects.get_or_create(key=key)
+        if created:
+            file_set.files.set(files) 
+        return file_set, created
+
+
 class Location(models.Model):
   
     class Meta:
@@ -330,26 +360,40 @@ class Manifest(models.Model):
 
     id = models.AutoField(primary_key=True)
     cfa_file = models.ForeignKey(File, on_delete=models.CASCADE, related_name="manifests")
-    fragments = models.ManyToManyField(File,related_name='fragment_set')
+    fragments = models.ForeignKey(FileSet, null=True, on_delete=models.CASCADE)
     bounds = models.BinaryField(null=True)
     units = models.CharField(null=True, max_length=20)
     calendar = models.CharField(null=True,max_length=20)
     total_size = models.PositiveBigIntegerField(null=True)
     parent_uuid = models.UUIDField(null=True)
+    is_quark = models.BooleanField(default=False)
 
     def delete(self,*args,**kwargs):
-        ignore = kwargs.pop('islastvar',None)
-        for f in self.fragments.all():
-            f.delete()
+        kwargs.pop('islastvar',None)
+        if self.is_quark:
+            self.fragments.delete()
+        else:
+            if not self.is_quark:
+                for f in self.fragments.files.all():
+                    f.delete()
+            self.fragments.delete()
         super().delete(*args,**kwargs)
 
     def __str__(self):
-        fcount = self.fragments.count()
-        return f'Manifest ({fcount} fragments from {self.cfa_file.name})\n             (first file {self.fragments.first()}).'
-
+        fcount = self.fragment_count()
+        lines = [f'Manifest {self.id} for {self.cfa_file} has {fcount} fragments',
+                 f'     (First file {self.fragments.files.first()},',
+                 f'      Last file  {self.fragments.files.last()} )']
+        return '\n'.join(lines)
+       
     def fragments_as_text(self):
         """ Download a list of fragments for action"""
-        return '\n'.join([f.name for f in self.fragments.all()])
+        fragments = self.fragments.files.all()
+        return '\n'.join([f.name for f in fragments])
+    
+    def fragment_count(self):
+        return self.fragments.files.count()
+    
 
 class Relationship(models.Model):
 
@@ -400,13 +444,17 @@ class TimeDomain(models.Model):
     @property
     def cfend(self):
         return cf.Data(self.ending, units=self.units, calendar=self.calendar)
-        
+
     @property
     def cfdelta(self):
         if self.interval_units=='month' and self.calendar=='360_day':
             return cf.Data(self.interval*30, units='day')
         else:
             return cf.Data(self.interval, units=self.interval_units)
+
+    @property
+    def cfrange(self):
+        return self.cfstart,self.cfend
 
     @property
     def nt(self):
@@ -625,9 +673,14 @@ class Variable(models.Model):
         We have our own specific get_or_create_unique_instance method
         (calls __check_uniqueness__)
         """
+        def clean_proxied_data(data):
+            return {k: (v if not (isinstance(v, float) and math.isnan(v)) else None) for k, v in data.items()}
+        _proxied = clean_proxied_data(_proxied)
+
         unique, instance =  cls.__check_uniqueness(key_properties, _proxied, spatial_domain, time_domain, cell_methods, 
                                       in_file, in_manifest)
         if unique:
+           
             key_properties_set, _ = VariablePropertySet.get_or_create_from_properties(key_properties)
             new_instance = cls(
                 _proxied=_proxied,
@@ -644,8 +697,12 @@ class Variable(models.Model):
                 new_instance.save()
             except:
                 logger.debug('Crash coming. Details follow')
+                logger.debug(_proxied)
                 logger.debug(new_instance._vars(with_proxied=False))
                 logger.debug(key_properties)
+                import json
+                jd = json.dumps(_proxied)
+                logger.debug(jd)
                 raise
 
             return new_instance, True  # Return the new instance and a flag indicating creation
@@ -689,6 +746,9 @@ class Variable(models.Model):
     def delete(self,*args,**kwargs):
         self.predelete()
         super().delete(*args,**kwargs)
+
+ 
+
 
 
    

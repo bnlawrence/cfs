@@ -142,6 +142,11 @@ def test_locations(test_db):
     assert l.name == loc
     assert l.volume == len(files)*10
 
+def test_delete_files(test_db):
+    files = test_db.file.all()
+    for f in files:
+        f.delete()
+    assert test_db.file.count() == 0
 
 def NOtest_delete_file_from_collection():
     raise NotImplementedError
