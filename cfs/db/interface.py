@@ -407,9 +407,8 @@ class CollectionInterface(GenericInterface):
                 if t:
                     tcreated+=1
             except ValueError:
-                # out of bounds error
+                # out of bounds error 
                 pass
-
             print(f'Done var {i+1}/{nv},',c,m,t)
             
            
@@ -796,7 +795,6 @@ class TimeInterface(GenericInterface):
         :return: time subset
         :rtype: TimeDomain instance
         """
-        print ('td.starting , td.ending=',td.starting , td.ending, start_date, end_date)
         if start_date < td.starting or end_date > td.ending:
             raise ValueError('Attempt to subset timedomain is outside domain')
         values = {}
@@ -1062,7 +1060,7 @@ class VariableInterface(GenericInterface):
             td = v.time_domain
         except:
             raise
-        print('subset td:',td)
+        print(td)
         myunits = cf.Units(td.units, calendar=td.calendar)
         start_date = cf.Data(cf.dt(start_tuple[2], start_tuple[1], start_tuple[0]), units=myunits)
         end_date = cf.Data(cf.dt(end_tuple[2], end_tuple[1], end_tuple[0]), units=myunits)

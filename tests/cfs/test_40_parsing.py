@@ -64,7 +64,7 @@ def test_infer_timing():
 
 def test_domain(inputfield):
     
-    print('TEST_DOMAIN:\n',inputfield)
+    print(inputfield)
     d = extract_cfsdomain(inputfield)
     assert d['name'] == 'test'
     assert d['size'] == 40

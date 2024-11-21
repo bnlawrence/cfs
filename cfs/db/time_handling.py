@@ -337,6 +337,4 @@ class LookupT:
         m = re.match(r'(\d+(?:\.\d*)?|\.\d+) *(\w+)',offset)
         offset=int(m.group(1))
         return value, offset, units
-        
 
-        

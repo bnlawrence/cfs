@@ -238,7 +238,7 @@ class CFAhandler:
             tdimvar = None
 
         calendar = getattr(tdim, 'calendar', 'standard')
-            
+
         #have we seen this before?
         manikey = consistent_hash(filenames)
         if manikey in self.known_manifests:
@@ -283,7 +283,7 @@ class CFAhandler:
     def _parse_bounds_from_field(self, field, tdim):
         """ 
         Sort out the time bounds corresponding to each fragment file
-        """        
+        """
         ncvar = field.nc_get_variable()
         alocations = self.__get_cfalocation(ncvar)
         if tdim.has_bounds():
@@ -307,7 +307,6 @@ class CFAhandler:
         to get the width of each of the fragments in bound space.)
         """
         ncv = self.dataset.variables[ncvar]
-        print (ncv)
         aggregated_data = ncv.attrs['aggregated_data']
         parsed_aggregated_data = dict(zip(aggregated_data.split()[::2], aggregated_data.split()[1::2]))
         location = parsed_aggregated_data['map:']

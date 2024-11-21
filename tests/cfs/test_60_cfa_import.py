@@ -61,60 +61,12 @@ def cfa_resources(tmp_path, inputfield):
     posix_path.mkdir(exist_ok=True)  
 
     filenames = [posix_path/f'test_file{x}.nc' for x in range(3)]
-    print(inputfield)
     for f, index in zip(filenames, range(0, 36, 12)):
-        print(index, f )
         cf.write(inputfield[index:index+12], f)
-                                     
-    print ('ZZZZZZ', list(posix_path.glob('*.nc')))
+
     f = cf.read(posix_path.glob('*.nc'), cfa_write='field')[0]
-    print(f)
-#    f.data.nc_update_aggregation_substitutions({'base': f"{posix_path}/"})
-    
     cfa_file = str(posix_path/'test_file.cfa')
-
-    cf.write(f, cfa_file, cfa={"constructs": "field", "uri": "relative"}) 
-
-    return posix_path
-
-    f1 = inputfield
-    f2 = f1.copy()
-    f3 = f1.copy()
-
-    # there will be a more elegant way of doing this, but this is fine for now
-    new_dates1 = np.array([135,165,195,225])
-    new_bounds1 = np.array([[121,150],[151,180],[181,210],[211,240]])
-    new_dates2 = new_dates1 + 120
-    new_bounds2 = new_bounds1 + 120
-
-    for nd, nb, f in zip([new_dates1,new_dates2], [new_bounds1, new_bounds2],[f2,f3]):
-        dimT = cf.DimensionCoordinate(
-                    properties={'standard_name': 'time',
-                                'units':   cf.Units('days since 2018-12-30',calendar='360_day')},
-                    data=cf.Data(nd),
-                    bounds=cf.Bounds(data=cf.Data(nb))
-                    )
-        f.set_construct(dimT)
-
-    fields = [f1,f2,f3]
-
-    filenames = [posix_path/f'test_file{x}.nc' for x in range(3)]
-    for v,f in zip(fields,filenames):
-        cf.write(v, f)
-
-    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')[0]
-    cfa_file = str(posix_path/'test_file.nc')
-    #FIXME: I don't think the substitutions are being parsed properly.
-    print ('\n\n\nppp', str(cfa_file))
-    print (88888888888888, cf.dirname(cfa_file))
-    print(f)
-    print(f.get_filenames())
-#    f.data.nc_update_aggregation_substitutions({'base': f"{posix_path}/"})
-    
-    cf.write(f, cfa_file, cfa={'constructs': 'field','uri':'relative'})
-#    fix_filenames(cfa_file)
-   
-    print('CFA setup with three files and one field')
+    cf.write(f, cfa_file, cfa='field')
 
     return posix_path
 
@@ -180,10 +132,7 @@ def test_tdquarking(django_dependencies):
     test_db, ignore, ignore = django_dependencies
     v = test_db.variable.all()[0]
     td = v.time_domain
-    print ('td=', td)
     myunits = cf.Units(td.units, calendar=td.calendar)
-#    start_date = cf.Data(cf.dt(2019, 2, 15), units=myunits)
-#    end_date = cf.Data(cf.dt(2019, 11, 15), units=myunits)
     start_date = cf.Data(cf.dt(1961, 2, 15), units=myunits)
     end_date = cf.Data(cf.dt(1961, 11, 15), units=myunits)
     from cfs.db.interface import TimeInterface
@@ -202,7 +151,6 @@ def test_quarks(django_dependencies):
     
     #first test something that should just return the original atomic dataset, no quark
     newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,12, 1959), (15,11,1962))
-    print('newv, created, mcreated, tcreated',  newv, created, mcreated, tcreated )
     assert tcreated == mcreated == created == False
     assert newv == v
 
