@@ -1,4 +1,9 @@
 from setuptools import setup, find_packages
+
+# Get dependencies
+requirements = open("requirements.txt", "r")
+install_requires = requirements.read().splitlines()
+
 setup(
     name='cfs',
     version='0.1',
@@ -8,17 +13,5 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     scripts=[], 
-    install_requires = [
-        'django',
-        'djangorestframework',
-        'click',
-        'rich',
-        'tqdm',
-        'cf-python',
-        'h5netcdf',
-        'mkdocs>=1.1',
-        'mkdocstrings>=0.26',
-        'mkdocstrings-python>=1.11',
-        #'mkdocs-build-plantuml-plugin'
-        ]
-    )
+    install_requires=install_requires,
+)

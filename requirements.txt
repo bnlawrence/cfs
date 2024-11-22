@@ -1,0 +1,11 @@
+django
+djangorestframework
+click
+rich
+tqdm
+cfdm @ git+https://github.com/davidhassell/cfdm@cfa-for-cfs
+cf-python @ git+https://github.com/davidhassell/cf-python@cfa-for-cfs
+h5netcdf
+mkdocs>=1.1
+mkdocstrings>=0.26
+mkdocstrings-python>=1.11

@@ -102,7 +102,6 @@ def get_quark_field(instance, start_date, end_date):
     fld.set_construct(dimT, axes=T_axis)
     print('Subspacing using cellwi to ',start_date, end_date)
 
-    print(fld.dump())
     quark = fld.subspace(time=cf_cells_overlap(start_date, end_date))
     dimT = quark.dimension_coordinate('T')
     return quark, bounds_range(dimT.bounds)
