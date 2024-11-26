@@ -243,6 +243,9 @@ class File(models.Model):
     checksum_method = models.CharField(max_length=8,null=True)
     uuid = models.UUIDField(null=True)
     format = models.CharField(max_length=3, null=True)
+    #if there is a remotely accessible version
+    #definition of remote includes our own tape system.
+    remoteuri = models.URLField(null=True,max_length=200)
     #cfa_file = models.ForeignKey(
     #    'self', on_delete=models.SET_NULL,
     #    related_name='fragments',
