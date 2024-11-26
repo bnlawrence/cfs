@@ -77,7 +77,7 @@ def test_atomic_name(inputfield):
 def test_field_parsing(inputfield):
 
     adict = parse_fields_todict([inputfield], lookup_xy=None)[0][0]
-    assert adict['identity'] == 'specific_humidity'
+    assert adict['identity'] == 'air_potential_temperature'
     assert 'units' in adict['_proxied']
     assert adict['time_domain']['interval'] == 1
     assert adict['spatial_domain']['name'] == 'test'

@@ -236,6 +236,8 @@ class CFAhandler:
         else:
             tdimvar = None
 
+        calendar = getattr(tdim, 'calendar', 'standard')
+
         #have we seen this before?
         manikey = consistent_hash(filenames)
         if manikey in self.known_manifests:
@@ -251,7 +253,7 @@ class CFAhandler:
                 new_manifest = CFAManifest.from_dbdict(candidate_manifest)
                 if tdimvar is not None:
                     bounds = self._parse_bounds_from_field(field, tdim)
-                    new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
+                    new_manifest.add_bounds(bounds, tdim.units, calendar, tdimvar)
                    
                 # th other option is that we've got no bounds, the boundless manifest is what we want.
                 return self._add_known_and_exit(new_manifest,field)
@@ -262,7 +264,7 @@ class CFAhandler:
             new_manifest.add_fragment(f)
         if tdim is not None:
             bounds = self._parse_bounds_from_field(field, tdim)
-            new_manifest.add_bounds(bounds, tdim.units, tdim.calendar, tdimvar)
+            new_manifest.add_bounds(bounds, tdim.units, calendar, tdimvar)
         return self._add_known_and_exit(new_manifest, field)
 
     def _add_known_and_exit(self, manifest, field):
@@ -306,7 +308,7 @@ class CFAhandler:
         ncv = self.dataset.variables[ncvar]
         aggregated_data = ncv.attrs['aggregated_data']
         parsed_aggregated_data = dict(zip(aggregated_data.split()[::2], aggregated_data.split()[1::2]))
-        location = parsed_aggregated_data['location:']
+        location = parsed_aggregated_data['map:']
         #FIXME: this assumes time is the first dimension 
         location = self.dataset.variables[location][:][0]
         return location

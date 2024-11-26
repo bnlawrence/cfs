@@ -7,7 +7,7 @@ import os
 from cfs.db.standalone import setup_django
 from django.core.exceptions import ObjectDoesNotExist
 
-VARIABLE_LIST = ['specific_humidity',]
+VARIABLE_LIST = ['air_potential_temperature']
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_db(tmp_path_factory, request):
@@ -59,41 +59,14 @@ def cfa_resources(tmp_path, inputfield):
 
     posix_path = tmp_path / 'posix_root'  
     posix_path.mkdir(exist_ok=True)  
-    
-    f1 = inputfield
-    f2 = f1.copy()
-    f3 = f1.copy()
-
-    # there will be a more elegant way of doing this, but this is fine for now
-    new_dates1 = np.array([135,165,195,225])
-    new_bounds1 = np.array([[121,150],[151,180],[181,210],[211,240]])
-    new_dates2 = new_dates1 + 120
-    new_bounds2 = new_bounds1 + 120
-
-    for nd, nb, f in zip([new_dates1,new_dates2], [new_bounds1, new_bounds2],[f2,f3]):
-        dimT = cf.DimensionCoordinate(
-                    properties={'standard_name': 'time',
-                                'units':   cf.Units('days since 2018-12-30',calendar='360_day')},
-                    data=cf.Data(nd),
-                    bounds=cf.Bounds(data=cf.Data(nb))
-                    )
-        f.set_construct(dimT)
-
-    fields = [f1,f2,f3]
 
     filenames = [posix_path/f'test_file{x}.nc' for x in range(3)]
-    for v,f in zip(fields,filenames):
-        cf.write([v,],f)
+    for f, index in zip(filenames, range(0, 36, 12)):
+        cf.write(inputfield[index:index+12], f)
 
-    f = cf.read(posix_path.glob('*.nc'))
-    cfa_file = posix_path/'test_file.nc'
-    #FIXME: I don't think the substitutions are being parsed properly.
-    
-    cf.write(f, cfa_file, cfa={'absolute_paths':False,
-                               'substitutions':{'base':'./'}})
-    fix_filenames(cfa_file)
-   
-    print('CFA setup with three files and one field')
+    f = cf.read(posix_path.glob('*.nc'), cfa_write='field')[0]
+    cfa_file = str(posix_path/'test_file.cfa')
+    cf.write(f, cfa_file, cfa='field')
 
     return posix_path
 
@@ -114,7 +87,8 @@ def test_cfa_view(django_dependencies, cfa_resources):
         intent='C'
         )
     c1 = test_db.collection.retrieve(name='posix_cfa_example')
-    assert set([x.get_kp('standard_name') for x in c1.variables.all()]) == set(VARIABLE_LIST)
+    assert set([x.get_kp('standard_name')
+                for x in c1.variables.all()]) == set(VARIABLE_LIST)
 
 
 def test_fragments(django_dependencies):
@@ -159,8 +133,8 @@ def test_tdquarking(django_dependencies):
     v = test_db.variable.all()[0]
     td = v.time_domain
     myunits = cf.Units(td.units, calendar=td.calendar)
-    start_date = cf.Data(cf.dt(2019, 2, 15), units=myunits)
-    end_date = cf.Data(cf.dt(2019, 11, 15), units=myunits)
+    start_date = cf.Data(cf.dt(1961, 2, 15), units=myunits)
+    end_date = cf.Data(cf.dt(1961, 11, 15), units=myunits)
     from cfs.db.interface import TimeInterface
     td, tcreated = TimeInterface.subset(td, start_date, end_date)
     assert tcreated is True
@@ -176,12 +150,12 @@ def test_quarks(django_dependencies):
     tdunits= cf.Units(td.units,calendar=td.calendar)
     
     #first test something that should just return the original atomic dataset, no quark
-    newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,2,2019), (15,11,2019))
+    newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,12, 1959), (15,11,1962))
     assert tcreated == mcreated == created == False
     assert newv == v
 
     #now do a test which really will get a different result
-    newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,5,2019), (15,9,2019))
+    newv, created, mcreated, tcreated = test_db.variable.subset(v, (15,5,1960), (15,9,1961))
     assert tcreated == mcreated == created == True
     assert newv.in_manifest.fragment_count() == 2
     assert newv != v
