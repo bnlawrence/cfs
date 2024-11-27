@@ -91,10 +91,10 @@ if not DBDIR.is_dir():
 
 # Now we need a migrations directory for our application
 # we need to be able to make this directory importable to be used for 
-# 
 # migrations
-if str(DBDIR) not in sys.path:
-    sys.path.append(DBDIR)
+#if str(DBDIR.parent) not in sys.path:
+#    sys.path.append(DBDIR.parent)
+os.environ['PYTHONPATH'] = str(DBDIR.parent)
 
 # db this is the name of the database in the app label meta of the models in 
 # cfs.models.py. It needs to be at least one directory away from the migrations dir
@@ -108,12 +108,11 @@ init_file = migrations_dir/'__init__.py'
 init_file.touch(exist_ok=True)
 
 dblast = Path(DBDIR).name
-
 # now force everthing to use that
+migrate_dir = f'{dblast}.cfs_migrations'
 MIGRATION_MODULES={
-    'cfs': f'{dblast}.cfs_migrations',
+    'cfs': migrate_dir,
 }
-
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
@@ -163,8 +162,11 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [
-    BASE_DIR / "static", 
+    DBDIR / "static", 
 ]
+for d in STATICFILES_DIRS:
+    if not d.exists():
+        d.mkdir()
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
