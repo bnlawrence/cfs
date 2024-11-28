@@ -24,4 +24,4 @@ vars3 = db.variable.retrieve_by_properties({'standard_name':'eastward_wind',
 
 print(len(vars0), len(vars1), len(vars2), len(vars3))
 
-assert len(vars3) == 6
+assert len(vars3) == 3

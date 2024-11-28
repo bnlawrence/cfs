@@ -496,6 +496,10 @@ class VariablePropertyKeys(models.TextChoices):
     REALM = "R", "realm"
     EXPERIMENT = 'E', "experiment"
     RUNID = 'RI', "runid"
+    INSTITUTE = 'IN', "institute"
+    ACTIVITY = 'AC', "activity_id"
+    BRANCH = 'BM', "branch_method"
+    OWNER = 'O', "owner"
 
     @classmethod
     def mykey(cls,myvalue):

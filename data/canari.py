@@ -2,6 +2,7 @@ from pathlib import Path
 from time import time
 here = Path(__file__).parent.resolve()
 import os
+os.environ['CFS_DBDIR'] = str(here) 
 from django import setup
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.settings')
 setup()
@@ -29,6 +30,7 @@ def load(P, cname, restart=True):
                  regex='CANARI*.cfa',
                  intent='C',
                  fixer = check_for_canari_metadata_issues,
+                 vocab='CANARI',
     )
     t1 = time()-t0
     print(f'Canari load took {t1:.2f}s')
@@ -41,6 +43,7 @@ def show_vars():
 
 if __name__=="__main__":
     # If we need to blow the database away, remove it from here, and follow the django startup from the docs
+    
     P = Posix(db,'cfs data dir')
     load(P, 'canari_test1')
     show_vars()

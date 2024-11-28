@@ -25,3 +25,4 @@ def inputfield():
         cf.CellMethod(axes=f.domain_axis('T', key=True), method='maximum')
     )
     return f
+

@@ -1,0 +1,10 @@
+Project: RAMIP
+description: >
+    A description of the Regional Aerosol Model Intercomparison Project.
+atomic_facets: 'experiment, source-id, variant_label, realm'
+facets:
+  - key: source_id
+    url: https://raw.githubusercontent.com/WCRP-CMIP/CMIP6_CVs/master/CMIP6_source_id.json
+  - key: institution
+  - key: variant_label
+  - key: experiment

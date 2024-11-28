@@ -1,4 +1,5 @@
 from cfs.db.time_handling import LookupT
+from cfs.db.project_config import ProjectInfo
 import numpy as np
 from cfs.db.cfa_tools import CFAhandler
 from time import time
@@ -53,16 +54,12 @@ class LookupXY:
         else:
             raise AttributeError(f"'{self.__class__.__name__}' has no information about '{key}'")
 
-
-
-
-def parse2atomic_name(field):
+def parse2atomic_name(field, atomic_params):
     """ 
     Make some sensible guesses for the "atomic_origin" of this 
     field.
     """
-    names = ['project','mip','experiment','institution','source-id','variant-label','realm']
-    values = [field.get_property(n, None) for n in names]
+    values = [field.get_property(n, None) for n in atomic_params]
     use  = [v for v in values if v is not None]
     return '/'.join(use) 
 
@@ -107,7 +104,7 @@ def extract_cfsdomain(field, lookup_xy=LookupXY):
     return domain_properties
 
 
-def parse_fields_todict(fields, lookup_xy=None, cfa=False):
+def parse_fields_todict(fields, lookup_xy=None, vocab=None, cfa=False):
     """
     Parse a list of cf-python fields into a list of properties suitable for loading into the database.
     : fields : a list of cf fields
@@ -124,15 +121,26 @@ def parse_fields_todict(fields, lookup_xy=None, cfa=False):
             lookup_xy=LookupXY
     lookup_t = LookupT()
 
+    if vocab is not None:
+        info = ProjectInfo()
+        atomic_params = info.get_atomic_params(vocab)
+        default_params = info.get_facets(vocab)
+        for f in ['standard_name','long_name','realm','frequency']:
+            if f not in default_params:
+                default_params.append(f)
+    else:
+        atomic_params = ['project','mip','experiment','institution','source-id','variant-label','realm']
+        default_params = ['standard_name','long_name','realm','source_id','frequency',
+                  'source','variant_label','experiment','runid']
+        
      # loop over fields in file (not the same as netcdf variables)
     for v in fields:
         t1 = time()
-        description = {'atomic_origin': parse2atomic_name(v), 'identity':v.identity()}
+        description = {'atomic_origin': parse2atomic_name(v, atomic_params), 'identity':v.identity()}
         if cfa:
             description['manikey'] = cfahandler.parse_field_to_manifest(v)
         properties = v.properties()
-        for k in ['standard_name','long_name','realm','source_id','frequency',
-                  'source','variant_label','experiment','runid']:
+        for k in default_params:
             description[k] = v.get_property(k,None)
             if description[k] is not None:
                 properties.pop(k)

@@ -1155,7 +1155,7 @@ class CollectionDB:
                                                [f], lazy, update=True, progress=False )[0]
 
 
-    def upload_file_to_collection(self, location_name, collection_name, filedata):
+    def upload_file_to_collection(self, location_name, collection_name, filedata, vocab=None):
         """
         Upload a file and set of variables described by <filedata> to the database.
         This method should only be used for the first time these data are exposed
@@ -1169,6 +1169,7 @@ class CollectionDB:
 
         : location_name : the location where the file is stored
         : collection_name : the primary collection for these data.
+        : vocab: A project name for which vocabs can be found.
         : filedata : A dictionary with the following structure
         {'properties':{Dictionary of file properties},
          'variables': List of dictionaries of variable properties.
@@ -1194,6 +1195,9 @@ class CollectionDB:
         except Location.DoesNotExist:
             raise ValueError("Location not yet available in database")
         
+        if vocab is not None:
+            cv = self.collection.retrieve(name=vocab)
+
         # manually controlling rollback
         step = 0
         created = []
@@ -1241,6 +1245,8 @@ class CollectionDB:
             step = 4
             for v in vars:
                 self.variable.add_to_collection(c.name,v)
+                if vocab is not None:
+                    self.variable.add_to_collection(cv.name,v)
             return vars
         
         except ExceptionGroup as e:

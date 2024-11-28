@@ -1,7 +1,9 @@
 from cfs.db.file_handling import cfupload_ncfiles
 from django.core.exceptions import ObjectDoesNotExist
 from pathlib import Path
+from cfs.db.project_config import ProjectInfo
 import logging
+
 logger = logging.getLogger(__name__)
 
 class Posix:
@@ -36,6 +38,7 @@ class Posix:
         checksum=None,
         regex='*.nc',
         intent='S',
+        vocab=None,
         fixer=None
     ):
         """
@@ -55,6 +58,7 @@ class Posix:
         : intent : a single letter which should correspond to the intended type of collection, which should represent
                  whether or not the collection consists of atomic datasets, quarks, or standalone files.
                  (A, Q, S).
+        : vocab: a vocab name which can be accessed by project config to get terms to be used in the db (as opposed loaded into proxies)
         : fixer : a function which can be applied to fields to fix metadata
         """
         # Require a unique collection name here
@@ -65,6 +69,14 @@ class Posix:
             c = self.db.collection.create(name=collection_name, description=collection_description)
             self.db.collection.add_type(c,'_type',intent)
 
+        # if the vocab argument is provided, we'll use that as a collection too!
+        if vocab is not None and vocab != collection_name:
+            try:
+                cv = self.db.collection.retrieve(name=vocab)
+            except:
+                info = ProjectInfo()
+                cv = self.db.collection.create(name=vocab, 
+                        description=info.get_description(vocab))
         args = [
             str(path_to_collection_head),
             collection_name,
@@ -72,6 +84,7 @@ class Posix:
             subcollections,
             checksum,
             regex,
+            vocab,
         ]
         keys = [
             "_path_to_collection_head",
@@ -80,6 +93,7 @@ class Posix:
             "_subcollections",
             "_checksum",
             "_regex",
+            "_vocab",
         ]
 
         if regex is None:
@@ -89,7 +103,6 @@ class Posix:
         cfa = pr.suffix=='.cfa'
 
         logger.info(f'Posix upload using {regex} is a CFA upload {cfa}')
-        print(pr.suffix)
 
         # record details of how collection was established as collection properties
         for k,v in zip(keys,args):
@@ -122,8 +135,7 @@ class Posix:
                     #print(f'Created {cc} with parent {pd}')
                     #ppd = self.db.collection_retrieve(pd)
                     self.db.relationship.add_double(pd,cc.name,'parent_of','subdir_of')
-        logger.info('Before call')
-        cfupload_ncfiles(self.db, self.location, c, dbfiles, intent, cfa=cfa, fixer=fixer)
+        cfupload_ncfiles(self.db, self.location, c, vocab, dbfiles, intent, cfa=cfa, fixer=fixer)
      
 
 def file2dict(p, parents, checksum=None):

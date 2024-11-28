@@ -1,0 +1,33 @@
+Project: CANARI
+    # description is a praragraph of text to describe a project. 
+description: > 
+    These are the large ensemble simulations of the CANARI Project.
+    There are 40 simulations.
+    Much more information on mulitple lines.
+# Facets are the keys which are parsed out of files into the database 
+#    Each facet can be optionally associated with a URL to a controlled vocabulary json 
+#    file. If the url is present, ingestion will validate against the CV (one day)
+# For CANARI, some of these facets have been rewritten, we use the rewritten facet_names
+atomic_facets: 'experiment,source_id,variant_label,realm'
+# default facets will always include standard_name, long_name, realm, and frequency. and realm.
+# these are corrected facets, not necessarily those in the original file, depending        
+facets:
+  - key: institution
+    url: None
+  - key: experiment
+    url: 
+  - key: source_id
+  - key: variant_label
+  - key: activity_id
+  - key: branch_time_in_child
+  - key: branch_method
+  - key: parent_experiment_id
+  - key: parent_source_id
+  - key: parent_activity_id
+  - key: parent_time_units
+  - key: owner
+  - key: branch_time_in_parent
+  - key: frequency
+
+
+        

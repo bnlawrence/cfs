@@ -70,8 +70,8 @@ def test_domain(inputfield):
     assert d['size'] == 40
 
 def test_atomic_name(inputfield):
-
-    aname = parse2atomic_name(inputfield)
+    atomic_params = ['project','mip','experiment','institution','source-id','variant-label','realm']
+    aname = parse2atomic_name(inputfield, atomic_params)
     assert aname == 'testing/NCAS'
 
 def test_field_parsing(inputfield):
